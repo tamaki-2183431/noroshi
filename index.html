@@ -1,0 +1,4021 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a0d18">
+<meta name="format-detection" content="telephone=no">
+<title>のろし</title>
+<style>
+/* ============================================================================
+ *  のろし — 画面（第1弾 v3: ピクセル風景 + 360°ビュー + 新カラーピッカー）
+ * ========================================================================== */
+
+:root {
+  --bg: #080b14;
+  --bg-2: #0d1220;
+  --panel: rgba(255, 255, 255, 0.055);
+  --panel-2: rgba(255, 255, 255, 0.09);
+  --line: rgba(255, 255, 255, 0.11);
+  --fg: #eef2ff;
+  --muted: #93a0bd;
+  --accent: #ff9a3c;
+  --accent-2: #ffc061;
+  --danger: #ff9a8a;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic ProN",
+    "Noto Sans JP", "Yu Gothic", Meiryo, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.55;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+input, select { font: inherit; }
+
+[hidden] { display: none !important; }
+
+.app {
+  position: relative;
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* ===================================================================== ヒーロー */
+.hero {
+  position: relative;
+  height: clamp(280px, 56vh, 520px);
+  overflow: hidden;
+  background: #0b1020;
+  touch-action: pan-y;
+}
+
+.hero__canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+  /* 端数dprの端末（Android 2.75 など）でリサンプルされてぼけるのを防ぐ */
+  image-rendering: pixelated;
+}
+
+.hero__shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(6, 9, 18, 0.45) 0%, rgba(6, 9, 18, 0) 22%),
+    linear-gradient(to top, rgba(6, 9, 18, 0.72) 0%, rgba(6, 9, 18, 0.28) 16%, rgba(6, 9, 18, 0) 38%);
+}
+
+.hero__top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  padding: calc(12px + env(safe-area-inset-top)) 14px 0;
+  pointer-events: none;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 2px;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.55));
+}
+.brand__mark { width: 22px; height: 22px; display: block; }
+.brand__name {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: #fff;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+}
+
+.compass {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  pointer-events: none;
+}
+.compass__canvas {
+  display: block;
+  width: 62px;
+  height: 62px;
+}
+.compass__deg {
+  min-width: 54px;
+  padding: 1px 0;
+  text-align: center;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #fff;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.75);
+  font-variant-numeric: tabular-nums;
+}
+
+/* CTA は風景の下（一覧の上）に置く。風景に重ねない */
+.home__cta {
+  padding: 12px 16px 2px;
+  background: var(--bg);
+}
+
+.cta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  height: 56px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffc061, #ff8a2b);
+  color: #2a1405;
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 10px 26px rgba(255, 130, 40, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 0.08s;
+}
+.cta:active { transform: translateY(1px) scale(0.995); }
+.cta__flame { width: 20px; height: 20px; display: block; }
+
+/* ===================================================================== 一覧 */
+.main { padding: 0 14px calc(28px + env(safe-area-inset-bottom)); }
+
+.listbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 2px 10px;
+}
+.listbar__lead {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.listbar__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+.listbar__updated {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.refreshbtn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-width: 76px;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 800;
+}
+.refreshbtn:disabled { opacity: 0.7; }
+.refreshbtn__icon { width: 15px; height: 15px; display: block; flex: 0 0 auto; }
+.refreshbtn[data-busy="true"] .refreshbtn__icon { animation: spin 0.9s linear infinite; color: var(--accent); }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.select { position: relative; flex: 0 0 auto; }
+.select select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 44px;
+  padding: 0 30px 0 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 700;
+}
+.select::after {
+  content: "";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  margin-top: -5px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.home__status {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 154, 138, 0.26);
+  background: rgba(255, 154, 138, 0.09);
+  font-size: 12.5px;
+  color: #ffd3c9;
+}
+.home__status p { margin: 0; flex: 1 1 auto; }
+.status__btn {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 0 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 154, 138, 0.4);
+  color: #ffd3c9;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.post {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid rgba(255, 255, 255, 0.055);
+}
+.post--mine { border-color: rgba(255, 154, 60, 0.32); background: rgba(255, 154, 60, 0.07); }
+
+.post__flame { flex: 0 0 24px; width: 24px; height: 28px; display: block; }
+
+.post__body { flex: 1 1 auto; min-width: 0; }
+.post__age {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.post__sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.post__dist { white-space: nowrap; }
+
+.mine {
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.7;
+  padding: 0 7px;
+  border-radius: 999px;
+  color: #ffd9a0;
+  background: rgba(255, 176, 58, 0.16);
+  border: 1px solid rgba(255, 176, 58, 0.35);
+}
+
+.post__del {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 154, 138, 0.35);
+  background: rgba(255, 154, 138, 0.1);
+  color: var(--danger);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.accuracy-note {
+  margin: -2px 2px 10px;
+  padding: 7px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 206, 122, 0.22);
+  background: rgba(255, 206, 122, 0.08);
+  font-size: 11px;
+  line-height: 1.6;
+  color: #ffe3b8;
+}
+.accuracy-note[hidden] { display: none; }
+.empty {
+  margin: 26px 4px 20px;
+  text-align: center;
+}
+.empty__title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--fg);
+  line-height: 1.6;
+}
+.empty__sub {
+  margin: 4px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.empty__note {
+  margin: 10px auto 0;
+  max-width: 280px;
+  font-size: 11.5px;
+  color: var(--muted);
+  line-height: 1.7;
+}
+.empty__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  min-height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 800;
+}
+.listnote {
+  margin: 12px 4px 0;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: center;
+  line-height: 1.9;
+}
+
+/* =============================================================== 詳細画面 */
+.screen--detail { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+
+.dt__fire {
+  position: relative;
+  margin: 2px 14px 0;
+  height: clamp(150px, 26vh, 220px);
+  border-radius: 16px;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 100%, #1a2233 0%, #0a0d18 70%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+.dt__fire canvas { display: block; width: 100%; height: 100%; }
+
+.dt__list {
+  margin: 16px 14px 0;
+  padding: 0;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  overflow: hidden;
+}
+.dt__row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.dt__row:last-child { border-bottom: 0; }
+.dt__row dt {
+  flex: 0 0 62px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.dt__row dd {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--fg);
+  word-break: break-all;
+}
+.dt__row dd.dt__dd--sub { font-weight: 600; font-size: 13px; color: #cfd6ea; }
+
+.dt__map {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 12px 14px 0;
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--fg);
+  font-size: 13.5px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.dt__note {
+  margin: 12px 16px 0;
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted);
+  text-align: center;
+}
+.dt__error {
+  margin: 24px 16px;
+  font-size: 13.5px;
+  line-height: 1.8;
+  color: #ffd3c9;
+  text-align: center;
+}
+.dt__delete {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 18px 14px 0;
+  height: 48px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 154, 138, 0.35);
+  background: rgba(255, 154, 138, 0.1);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+/* =============================================================== 色選択画面 */
+/* 固定CTAに最後の行が隠れないよう、CTAの高さ＋safe-area＋余白を確保する */
+.screen--picker { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+
+.pk__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 52px;
+  padding: calc(4px + env(safe-area-inset-top)) 8px 0;
+}
+.pk__back {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 19px;
+  color: var(--fg);
+}
+.pk__title {
+  flex: 1 1 auto;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+.pk__spacer { width: 40px; }
+
+.pv {
+  position: relative;
+  margin: 4px 14px 0;
+  border-radius: 16px;
+  overflow: hidden;
+  background: #0b1020;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.pv__canvas { display: block; width: 100%; height: clamp(160px, 30vh, 330px); }
+.pv__hex {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(6, 9, 18, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: #fff;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin: 14px 14px 0;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.tab {
+  flex: 1 1 0;
+  height: 36px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.tab[aria-selected="true"] {
+  background: rgba(255, 255, 255, 0.92);
+  color: #14161f;
+}
+
+.panel { padding: 14px 14px 0; }
+
+/* 色相スライダー */
+.hue {
+  -webkit-appearance: none;
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 34px;
+  margin: 0 0 4px;
+  background: transparent;
+}
+.hue::-webkit-slider-runnable-track {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18);
+}
+.hue::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 26px;
+  height: 26px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #0d1220;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.55);
+}
+.hue::-moz-range-track {
+  height: 14px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff0000 0%, #ffff00 17%, #00ff00 33%, #00ffff 50%, #0000ff 67%, #ff00ff 83%, #ff0000 100%);
+}
+.hue::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #0d1220;
+}
+.hue:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.sv {
+  display: block;
+  width: 100%;
+  height: clamp(132px, 21vh, 180px);
+  margin-top: 6px;
+  border-radius: 14px;
+  touch-action: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
+}
+
+.hexrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  margin-top: 12px;
+  padding: 0 11px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.hexrow:focus-within { border-color: var(--accent); }
+.hexrow[data-invalid="true"] { border-color: rgba(255, 154, 138, 0.6); }
+.hexrow__hash { color: var(--muted); font-size: 15px; }
+.hexrow__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 16px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  outline: none;
+}
+.hexrow__chip {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.hexerr { margin: 6px 2px 0; font-size: 12px; color: var(--danger); }
+
+.rgbrow {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.rgb {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 44px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+}
+.rgb span { flex: 0 0 auto; font-size: 11px; font-weight: 800; color: var(--muted); }
+.rgb input {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  text-align: right;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.rgb input::-webkit-outer-spin-button,
+.rgb input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.rgb[data-invalid="true"] { border-color: rgba(255, 154, 138, 0.6); }
+
+/* 履歴 */
+.history__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.history__empty { margin: 6px 2px; font-size: 12.5px; color: var(--muted); }
+
+.swatch {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+.swatch[aria-pressed="true"] { border-color: #fff; }
+.swatch__x {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: #1b2132;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.clearbtn {
+  display: block;
+  width: 100%;
+  height: 44px;
+  margin-top: 16px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+.clearbtn:disabled { opacity: 0.45; }
+
+.pk__error {
+  margin: 12px 16px 0;
+  padding: 10px 12px;
+  border-radius: 13px;
+  border: 1px solid rgba(255, 154, 138, 0.26);
+  background: rgba(255, 154, 138, 0.09);
+  font-size: 12.5px;
+  color: #ffd3c9;
+  white-space: pre-line;
+}
+
+.pk__cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 20;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 30%, rgba(8, 11, 20, 0.86) 62%, rgba(8, 11, 20, 0) 100%);
+}
+.pk__cta button {
+  display: block;
+  width: 100%;
+  max-width: 532px;
+  height: 56px;
+  margin: 0 auto;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffc061, #ff8a2b);
+  color: #2a1405;
+  font-size: 16.5px;
+  font-weight: 800;
+  box-shadow: 0 10px 26px rgba(255, 130, 40, 0.3);
+}
+.pk__cta button:disabled {
+  background: #1b2132;
+  color: #6d7796;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ================================================================ モーダル等 */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 15, 0.74);
+}
+.overlay__box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 300px;
+  padding: 22px 20px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #141a29;
+  text-align: center;
+}
+.overlay__text { margin: 0; font-size: 13px; }
+.spinner {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.16);
+  border-top-color: var(--accent);
+  animation: spin 0.9s linear infinite;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(5, 8, 15, 0.74);
+}
+.modal__card {
+  width: 100%;
+  max-width: 320px;
+  padding: 20px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: #141a29;
+}
+.modal__title { margin: 0 0 6px; font-size: 15.5px; font-weight: 800; }
+.modal__text { margin: 0 0 16px; font-size: 12.5px; color: var(--muted); white-space: pre-line; }
+.modal__actions { display: flex; gap: 8px; }
+.modal__btn {
+  flex: 1 1 0;
+  height: 46px;
+  border-radius: 13px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  font-size: 14px;
+  font-weight: 700;
+}
+.modal__btn--danger {
+  border-color: rgba(255, 120, 90, 0.45);
+  background: rgba(255, 120, 90, 0.16);
+  color: var(--danger);
+}
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  z-index: 60;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 28px);
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: #1b2132;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+@media (max-width: 359px) {
+  .brand__name { font-size: 17px; }
+  .post__age { font-size: 14px; }
+  .cta { height: 52px; font-size: 15.5px; }
+  .rgb { padding: 0 8px; gap: 4px; }
+  .rgb input { font-size: 14px; }
+}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ================================================================== ホーム -->
+  <section class="screen screen--home" id="screen-home" aria-label="近くののろし">
+    <div class="hero" id="hero">
+      <canvas class="hero__canvas" id="scene" aria-label="近くののろしを煙で示した風景。左右にドラッグして見回せます"></canvas>
+      <div class="hero__shade"></div>
+
+      <header class="hero__top">
+        <div class="brand">
+          <svg class="brand__mark" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 19.6l14.2-2.5M5.2 17.1l13.8 2.6" stroke="#c98a5a" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+            <path d="M12 2.2c1.9 1.9 2.9 3.3 2.9 4.9 0 1.1-.6 2-1.5 2.5.9.6 1.5 1.7 1.5 3 0 2.4-1.8 4.2-4.1 4.2-2.4 0-4.2-1.8-4.2-4.4 0-2.7 1.6-4.6 3.4-6.1-.2 1.3.2 2.3 1 2.8C10 6.6 10.6 4.5 12 2.2z" fill="#ffae4a"/>
+            <path d="M10.7 11.1c1.2 1.2 1.9 2.1 1.9 3.2 0 1.3-.9 2.2-1.9 2.2s-1.9-.9-1.9-2.2c0-1.1.7-2 1.9-3.2z" fill="#fff0cf"/>
+          </svg>
+          <span class="brand__name">のろし</span>
+        </div>
+
+        <div class="compass" id="compass" role="img" aria-label="方位 北 0度">
+          <canvas class="compass__canvas" id="compass-canvas"></canvas>
+          <span class="compass__deg" id="compass-deg">0°</span>
+        </div>
+      </header>
+
+    </div>
+
+    <div class="home__cta">
+      <button type="button" class="cta" id="btn-cta">
+        <svg class="cta__flame" viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M5 19.6l14.2-2.5M5.2 17.1l13.8 2.6" stroke="#8a4a1e" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+          <path d="M12 2.2c1.9 1.9 2.9 3.3 2.9 4.9 0 1.1-.6 2-1.5 2.5.9.6 1.5 1.7 1.5 3 0 2.4-1.8 4.2-4.1 4.2-2.4 0-4.2-1.8-4.2-4.4 0-2.7 1.6-4.6 3.4-6.1-.2 1.3.2 2.3 1 2.8C10 6.6 10.6 4.5 12 2.2z" fill="currentColor"/>
+          <path d="M10.7 11.1c1.2 1.2 1.9 2.1 1.9 3.2 0 1.3-.9 2.2-1.9 2.2s-1.9-.9-1.9-2.2c0-1.1.7-2 1.9-3.2z" fill="#fff0cf"/>
+        </svg>
+        のろしを上げる
+      </button>
+    </div>
+
+    <div class="main">
+      <div class="listbar">
+        <div class="listbar__lead">
+          <h2 class="listbar__title">近くののろし</h2>
+          <span class="listbar__updated" id="list-updated">未取得</span>
+        </div>
+        <button type="button" class="refreshbtn" id="btn-refresh" data-busy="false">
+          <svg class="refreshbtn__icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M20 12a8 8 0 1 1-2.6-5.9" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+            <path d="M20.2 4.2v3.6h-3.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>更新</span>
+        </button>
+        <span class="select">
+          <select id="range-select" aria-label="表示範囲">
+            <option value="1000">1km</option>
+            <option value="3000">3km</option>
+            <option value="5000" selected>5km</option>
+            <option value="10000">10km</option>
+            <option value="20000">20km</option>
+          </select>
+        </span>
+      </div>
+
+      <p class="accuracy-note" id="accuracy-note" hidden></p>
+
+      <div class="home__status" id="home-status" hidden>
+        <p id="home-status-text"></p>
+        <button type="button" class="status__btn" id="btn-retry">もう一度</button>
+      </div>
+
+      <ul class="list" id="post-list"></ul>
+      <div class="empty" id="home-empty" hidden>
+        <p class="empty__title" id="empty-title">5km以内にのろしはありません</p>
+        <p class="empty__sub" id="empty-sub">のろしを上げるか、範囲を広げてみてください。</p>
+        <p class="empty__note" id="empty-note" hidden></p>
+        <button type="button" class="empty__btn" id="btn-widen" hidden>20kmに広げる</button>
+      </div>
+      <p class="listnote" id="list-note" hidden></p>
+    </div>
+  </section>
+
+  <!-- ================================================================ 色選択 -->
+  <section class="screen screen--picker" id="screen-picker" aria-label="色を選ぶ" hidden>
+    <header class="pk__head">
+      <button type="button" class="pk__back" id="btn-back" aria-label="ホームにもどる">&#8592;</button>
+      <h2 class="pk__title">色を選ぶ</h2>
+      <span class="pk__spacer"></span>
+    </header>
+
+    <div class="pv">
+      <canvas class="pv__canvas" id="preview" aria-label="焚き火と煙のプレビュー"></canvas>
+      <span class="pv__hex" id="pv-hex">#FF7A45</span>
+    </div>
+
+    <div class="tabs" role="tablist">
+      <button type="button" class="tab" id="tab-color" role="tab" aria-selected="true" aria-controls="panel-color">いろ</button>
+      <button type="button" class="tab" id="tab-history" role="tab" aria-selected="false" aria-controls="panel-history">履歴</button>
+    </div>
+
+    <div class="panel" id="panel-color">
+      <input type="range" class="hue" id="hue" min="0" max="360" step="1" aria-label="色相">
+      <canvas class="sv" id="sv" aria-label="明るさと鮮やかさ"></canvas>
+
+      <div class="hexrow" id="hex-row">
+        <span class="hexrow__hash" aria-hidden="true">#</span>
+        <input class="hexrow__input" id="hex-input" type="text" inputmode="text" maxlength="7"
+               spellcheck="false" autocapitalize="characters" autocomplete="off"
+               aria-label="HEXカラーコード（6桁）" aria-describedby="hex-error" value="FF7A45">
+        <span class="hexrow__chip" id="hex-chip"></span>
+      </div>
+      <p class="hexerr" id="hex-error" hidden>HEXは # を除く6桁の16進数で入力してください（例: FF7A45）</p>
+
+      <div class="rgbrow">
+        <label class="rgb" id="rgb-r-wrap"><span>R</span><input id="rgb-r" type="number" inputmode="numeric" min="0" max="255" value="255" aria-label="赤"></label>
+        <label class="rgb" id="rgb-g-wrap"><span>G</span><input id="rgb-g" type="number" inputmode="numeric" min="0" max="255" value="122" aria-label="緑"></label>
+        <label class="rgb" id="rgb-b-wrap"><span>B</span><input id="rgb-b" type="number" inputmode="numeric" min="0" max="255" value="69" aria-label="青"></label>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-history" hidden>
+      <div class="history__list" id="history-list"></div>
+      <p class="history__empty" id="history-empty">まだありません。色を決めてのろしを上げると記録されます。</p>
+      <button type="button" class="clearbtn" id="btn-clear-history">履歴をすべて消す</button>
+    </div>
+
+    <p class="pk__error" id="picker-error" hidden></p>
+
+    <div class="pk__cta">
+      <button type="button" id="btn-confirm">この色でのろしを上げる</button>
+    </div>
+  </section>
+
+  <!-- ================================================================ 詳細 -->
+  <section class="screen screen--detail" id="screen-detail" aria-label="のろしの詳細" hidden>
+    <header class="pk__head">
+      <button type="button" class="pk__back" id="btn-detail-back" aria-label="一覧にもどる">&#8592;</button>
+      <h2 class="pk__title">のろしの詳細</h2>
+      <span class="pk__spacer"></span>
+    </header>
+
+    <div class="dt__fire" id="detail-fire-wrap">
+      <canvas id="detail-fire" aria-label="投稿色の焚き火"></canvas>
+    </div>
+
+    <dl class="dt__list" id="detail-list">
+      <div class="dt__row"><dt>時刻</dt><dd id="dt-time">—</dd></div>
+      <div class="dt__row"><dt>距離</dt><dd id="dt-place">—</dd></div>
+      <div class="dt__row"><dt>場所</dt><dd id="dt-address" class="dt__dd--sub">—</dd></div>
+      <div class="dt__row" id="dt-coord-row" hidden><dt>座標</dt><dd id="dt-coord" class="dt__dd--sub">—</dd></div>
+    </dl>
+
+    <a class="dt__map" id="dt-map" href="#" target="_blank" rel="noopener noreferrer" hidden>Googleマップで開く</a>
+    <p class="dt__note" id="dt-note" hidden></p>
+    <p class="dt__error" id="dt-error" hidden>こののろしは見つかりませんでした。すでに消えている可能性があります。</p>
+    <button type="button" class="dt__delete" id="dt-delete" hidden>こののろしを消す</button>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="overlay__box">
+    <div class="spinner"></div>
+    <p class="overlay__text" id="overlay-text">読み込み中</p>
+  </div>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h3 class="modal__title" id="modal-title">こののろしを消しますか？</h3>
+    <p class="modal__text" id="modal-text">消すと元に戻せません。</p>
+    <div class="modal__actions">
+      <button type="button" class="modal__btn" id="modal-cancel">やめる</button>
+      <button type="button" class="modal__btn modal__btn--danger" id="modal-ok">消す</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
+
+<!-- ==========================================================================
+     B. 純粋関数（DOM に触れない。Node の単体テスト対象）
+     ========================================================================== -->
+<script>/*! SunCalc v1.9.0 | (c) 2011-2015 Vladimir Agafonkin | BSD-2-Clause | CDN不使用のインライン埋め込み */
+/**
+ * Minified by jsDelivr using Terser v5.39.0.
+ * Original file: /npm/suncalc@1.9.0/suncalc.js
+ *
+ * Do NOT use SRI with dynamically generated files! More information: https://www.jsdelivr.com/using-sri-with-dynamic-files
+ */
+!function(){"use strict";var n=Math.PI,t=Math.sin,e=Math.cos,r=Math.tan,a=Math.asin,u=Math.atan2,o=Math.acos,i=n/180,c=864e5,d=2440588,s=2451545;function f(n){return new Date((n+.5-d)*c)}function l(n){return function(n){return n.valueOf()/c-.5+d}(n)-s}var h=23.4397*i;function M(n,a){return u(t(n)*e(h)-r(a)*t(h),e(n))}function v(n,r){return a(t(r)*e(h)+e(r)*t(h)*t(n))}function g(n,a,o){return u(t(n),e(n)*t(a)-r(o)*e(a))}function w(n,r,u){return a(t(r)*t(u)+e(r)*e(u)*e(n))}function m(n,t){return i*(280.16+360.9856235*n)-t}function p(n){return i*(357.5291+.98560028*n)}function D(e){return e+i*(1.9148*t(e)+.02*t(2*e)+3e-4*t(3*e))+102.9372*i+n}function P(n){var t=D(p(n));return{dec:v(t,0),ra:M(t,0)}}var y={getPosition:function(n,t,e){var r=i*-e,a=i*t,u=l(n),o=P(u),c=m(u,r)-o.ra;return{azimuth:g(c,a,o.dec),altitude:w(c,a,o.dec)}}},b=y.times=[[-.833,"sunrise","sunset"],[-.3,"sunriseEnd","sunsetStart"],[-6,"dawn","dusk"],[-12,"nauticalDawn","nauticalDusk"],[-18,"nightEnd","night"],[6,"goldenHourEnd","goldenHour"]];y.addTime=function(n,t,e){b.push([n,t,e])};var H=9e-4;function T(t,e,r){return H+(t+e)/(2*n)+r}function E(n,e,r){return s+n+.0053*t(e)-.0069*t(2*r)}function I(n,r,a,u,i,c,d){var s=function(n,r,a){return o((t(n)-t(r)*t(a))/(e(r)*e(a)))}(n,a,u);return E(T(s,r,i),c,d)}function k(n){var r=i*(134.963+13.064993*n),a=i*(93.272+13.22935*n),u=i*(218.316+13.176396*n)+6.289*i*t(r),o=5.128*i*t(a),c=385001-20905*e(r);return{ra:M(u,o),dec:v(u,o),dist:c}}function q(n,t){return new Date(n.valueOf()+t*c/24)}y.getTimes=function(t,e,r,a){var u,o,c,d,s,h=i*-r,M=i*e,g=function(n){return-2.076*Math.sqrt(n)/60}(a=a||0),w=function(t,e){return Math.round(t-H-e/(2*n))}(l(t),h),m=T(0,h,w),P=p(m),y=D(P),k=v(y,0),q=E(m,P,y),x={solarNoon:f(q),nadir:f(q-.5)};for(u=0,o=b.length;u<o;u+=1)s=q-((d=I(((c=b[u])[0]+g)*i,h,M,k,w,P,y))-q),x[c[1]]=f(s),x[c[2]]=f(d);return x},y.getMoonPosition=function(n,a,o){var c=i*-o,d=i*a,s=l(n),f=k(s),h=m(s,c)-f.ra,M=w(h,d,f.dec),v=u(t(h),r(d)*e(f.dec)-t(f.dec)*e(h));return M+=function(n){return n<0&&(n=0),2967e-7/Math.tan(n+.00312536/(n+.08901179))}(M),{azimuth:g(h,d,f.dec),altitude:M,distance:f.dist,parallacticAngle:v}},y.getMoonIllumination=function(n){var r=l(n||new Date),a=P(r),i=k(r),c=149598e3,d=o(t(a.dec)*t(i.dec)+e(a.dec)*e(i.dec)*e(a.ra-i.ra)),s=u(c*t(d),i.dist-c*e(d)),f=u(e(a.dec)*t(a.ra-i.ra),t(a.dec)*e(i.dec)-e(a.dec)*t(i.dec)*e(a.ra-i.ra));return{fraction:(1+e(s))/2,phase:.5+.5*s*(f<0?-1:1)/Math.PI,angle:f}},y.getMoonTimes=function(n,t,e,r){var a=new Date(n);r?a.setUTCHours(0,0,0,0):a.setHours(0,0,0,0);for(var u,o,c,d,s,f,l,h,M,v,g,w,m,p=.133*i,D=y.getMoonPosition(a,t,e).altitude-p,P=1;P<=24&&(u=y.getMoonPosition(q(a,P),t,e).altitude-p,h=((s=(D+(o=y.getMoonPosition(q(a,P+1),t,e).altitude-p))/2-u)*(l=-(f=(o-D)/2)/(2*s))+f)*l+u,v=0,(M=f*f-4*s*u)>=0&&(g=l-(m=Math.sqrt(M)/(2*Math.abs(s))),w=l+m,Math.abs(g)<=1&&v++,Math.abs(w)<=1&&v++,g<-1&&(g=w)),1===v?D<0?c=P+g:d=P+g:2===v&&(c=P+(h<0?w:g),d=P+(h<0?g:w)),!c||!d);P+=2)D=o;var b={};return c&&(b.rise=q(a,c)),d&&(b.set=q(a,d)),c||d||(b[h>0?"alwaysUp":"alwaysDown"]=!0),b},"object"==typeof exports&&"undefined"!=typeof module?module.exports=y:"function"==typeof define&&define.amd?define(y):window.SunCalc=y}();
+//# sourceMappingURL=/sm/642c93d512bdfb16acb9a1a1651ed87b5915e3beae49cfeb0c949c27cdcd94a4.map
+</script>
+<script id="noroshi-pure">
+/* ===== PURE-START ===== */
+function parseHex(input) {
+  if (typeof input !== 'string') return null;
+  var s = input.trim();
+  if (s.charAt(0) === '#') s = s.slice(1);
+  if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
+  return '#' + s.toUpperCase();
+}
+
+function clampByte(n) {
+  var v = Math.round(Number(n));
+  if (!isFinite(v)) return 0;
+  return Math.max(0, Math.min(255, v));
+}
+
+function hexToRgb(hex) {
+  var h = parseHex(hex);
+  if (!h) return null;
+  return {
+    r: parseInt(h.slice(1, 3), 16),
+    g: parseInt(h.slice(3, 5), 16),
+    b: parseInt(h.slice(5, 7), 16)
+  };
+}
+
+function rgbToHex(rgb) {
+  if (!rgb) return null;
+  var part = function (n) {
+    var s = clampByte(n).toString(16).toUpperCase();
+    return s.length === 1 ? '0' + s : s;
+  };
+  return '#' + part(rgb.r) + part(rgb.g) + part(rgb.b);
+}
+
+function rgbToHsv(rgb) {
+  var r = clampByte(rgb.r) / 255;
+  var g = clampByte(rgb.g) / 255;
+  var b = clampByte(rgb.b) / 255;
+  var max = Math.max(r, g, b);
+  var min = Math.min(r, g, b);
+  var d = max - min;
+  var h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  return { h: h, s: max === 0 ? 0 : d / max, v: max };
+}
+
+function hsvToRgb(hsv) {
+  var h = ((hsv.h % 360) + 360) % 360;
+  var s = Math.max(0, Math.min(1, hsv.s));
+  var v = Math.max(0, Math.min(1, hsv.v));
+  var c = v * s;
+  var x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  var m = v - c;
+  var r = 0;
+  var g = 0;
+  var b = 0;
+  if (h < 60) { r = c; g = x; b = 0; }
+  else if (h < 120) { r = x; g = c; b = 0; }
+  else if (h < 180) { r = 0; g = c; b = x; }
+  else if (h < 240) { r = 0; g = x; b = c; }
+  else if (h < 300) { r = x; g = 0; b = c; }
+  else { r = c; g = 0; b = x; }
+  return {
+    r: Math.round((r + m) * 255),
+    g: Math.round((g + m) * 255),
+    b: Math.round((b + m) * 255)
+  };
+}
+
+function mixRgb(a, b, t) {
+  var w = Math.max(0, Math.min(1, t));
+  return {
+    r: Math.round(a.r * (1 - w) + b.r * w),
+    g: Math.round(a.g * (1 - w) + b.g * w),
+    b: Math.round(a.b * (1 - w) + b.b * w)
+  };
+}
+
+function rgbaOf(rgb, alpha) {
+  return 'rgba(' + clampByte(rgb.r) + ',' + clampByte(rgb.g) + ',' + clampByte(rgb.b) + ',' + alpha + ')';
+}
+
+function relativeLuminance(rgb) {
+  var channel = function (c) {
+    var s = clampByte(c) / 255;
+    return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * channel(rgb.r) + 0.7152 * channel(rgb.g) + 0.0722 * channel(rgb.b);
+}
+
+function contrastRatio(a, b) {
+  var l1 = relativeLuminance(a);
+  var l2 = relativeLuminance(b);
+  if (l1 < l2) { var t = l1; l1 = l2; l2 = t; }
+  return (l1 + 0.05) / (l2 + 0.05);
+}
+
+/** 縁取りの色: 明るい背景には濃く、暗い背景には白く */
+function pickStrokeRgb(bgRgb) {
+  if (!bgRgb) return { r: 255, g: 255, b: 255 };
+  return relativeLuminance(bgRgb) > 0.45 ? { r: 26, g: 20, b: 16 } : { r: 255, g: 255, b: 255 };
+}
+
+function shouldOutline(rgb, bgRgb, threshold) {
+  if (!rgb || !bgRgb) return false;
+  var limit = typeof threshold === 'number' ? threshold : 2.2;
+  return contrastRatio(rgb, bgRgb) < limit;
+}
+
+function formatAge(seconds) {
+  var s = Math.max(0, Math.floor(Number(seconds) || 0));
+  if (s < 60) return 'たったいま';
+  var m = Math.floor(s / 60);
+  if (m < 60) return m + '分前';
+  var h = Math.floor(m / 60);
+  var mm = m % 60;
+  return mm === 0 ? h + '時間前' : h + '時間' + mm + '分前';
+}
+
+function formatDistance(meters) {
+  var m = Math.max(0, Math.round(Number(meters) || 0));
+  if (m < 100) return '100m未満';
+  if (m < 1000) return m + 'm';
+  if (m < 10000) {
+    var km = m / 1000;
+    return (m % 1000 === 0 ? String(km) : km.toFixed(1)) + 'km';
+  }
+  return Math.round(m / 1000) + 'km';
+}
+
+function isPostExpired(expiresAtMs, nowMs) {
+  var e = Number(expiresAtMs);
+  if (!isFinite(e) || e <= 0) return true;
+  return nowMs >= e;
+}
+
+/** 色履歴: 新しい順・重複なし・上限20件 */
+function pushColorHistory(list, hex, max) {
+  var norm = parseHex(hex);
+  if (!norm) return (list || []).slice();
+  var limit = typeof max === 'number' && max > 0 ? max : 20;
+  var out = [norm];
+  var src = list || [];
+  for (var i = 0; i < src.length && out.length < limit; i++) {
+    var h = parseHex(src[i]);
+    if (h && out.indexOf(h) === -1) out.push(h);
+  }
+  return out;
+}
+
+function bytesToHex(bytes) {
+  var out = '';
+  for (var i = 0; i < bytes.length; i++) {
+    var b = bytes[i] & 0xff;
+    out += (b < 16 ? '0' : '') + b.toString(16);
+  }
+  return out;
+}
+
+/** 端末時刻から時間帯を決める（朝5-8 / 昼8-16 / 夕16-19 / 夜19-5） */
+function periodForHour(hour) {
+  var h = Number(hour);
+  if (!isFinite(h)) return 'night';
+  h = ((h % 24) + 24) % 24;
+  if (h >= 5 && h < 8) return 'morning';
+  if (h >= 8 && h < 16) return 'day';
+  if (h >= 16 && h < 19) return 'evening';
+  return 'night';
+}
+
+/** 検証用: ?tp=morning|day|evening|night で時間帯を固定（通常は無効） */
+function debugPeriod() {
+  var v = null;
+  try { v = new URLSearchParams(location.search).get('tp'); } catch (e) { return null; }
+  return (v === 'morning' || v === 'day' || v === 'evening' || v === 'night') ? v : null;
+}
+
+function wrapDeg(deg) {
+  var d = Number(deg);
+  if (!isFinite(d)) return 0;
+  return ((d % 360) + 360) % 360;
+}
+
+/** a から見た b の差（-180..180） */
+function angleDelta(a, b) {
+  return ((Number(a) - Number(b) + 540) % 360) - 180;
+}
+
+/** 距離(100m丸め) → 煙の背丈・太さ・濃さ・根元の位置（0..1の画面比） */
+function distanceToSmoke(distanceM, baseH) {
+  var d = Math.max(0, Number(distanceM) || 0);
+  var t = Math.min(1, Math.log10(1 + d) / Math.log10(20001));
+  var h = baseH * (0.55 - 0.32 * t);
+  var w = baseH * (0.075 - 0.037 * t);
+  var alpha = 0.86 - 0.42 * t;
+  var base = 0.82 - 0.2 * t;
+  return { h: h, w: w, alpha: alpha, base: base, t: t };
+}
+
+/** 方位の表示（0-359の整数 + 16方位） */
+function formatHeading(deg) {
+  return Math.round(wrapDeg(deg)) % 360 + '°';
+}
+
+function cardinalOf(deg) {
+  var names = ['北', '北北東', '北東', '東北東', '東', '東南東', '南東', '南南東',
+    '南', '南南西', '南西', '西南西', '西', '西北西', '北西', '北北西'];
+  var idx = Math.round(wrapDeg(deg) / 22.5) % 16;
+  return names[idx];
+}
+/* ---- 範囲・空表示・方位ラベル（純粋関数） ---- */
+
+/** 範囲の表示（1000 → '1km'） */
+function rangeLabelM(m) {
+  var n = Number(m);
+  if (!isFinite(n) || n <= 0) return '5km';
+  return (n % 1000 === 0 ? n / 1000 : Math.round(n / 100) / 10) + 'km';
+}
+
+/** 0件のときの見出し（'5km以内にのろしはありません'） */
+function emptyTitleFor(rangeM) {
+  return rangeLabelM(rangeM) + '以内にのろしはありません';
+}
+
+/** 選べる範囲（この5つだけを受け付ける） */
+var RANGE_VALUES = [1000, 3000, 5000, 10000, 20000];
+var RANGE_STORAGE_KEY = 'noroshi.rangeM';
+
+/** 保存された範囲を検証（1/3/5/10/20km以外は null） */
+function parseStoredRange(raw) {
+  var n = Number(raw);
+  if (!isFinite(n) || n <= 0) return null;
+  for (var i = 0; i < RANGE_VALUES.length; i++) {
+    if (RANGE_VALUES[i] === n) return n;
+  }
+  return null;
+}
+
+/** 方角の8方位（北・北東・…・北西。22.5度の境界） */
+function cardinalJa8(deg) {
+  var names = ['北', '北東', '東', '南東', '南', '南西', '西', '北西'];
+  var idx = Math.round(wrapDeg(deg) / 45) % 8;
+  return names[idx];
+}
+
+/** 一覧・詳細で使う「方角つき距離」（例: 北東の方角に200m） */
+function bearingPhrase(distanceM, bearingDeg) {
+  var d = formatDistance(distanceM);
+  if (bearingDeg === null || bearingDeg === undefined || !isFinite(Number(bearingDeg))) {
+    return 'すぐ近く・' + d;
+  }
+  return cardinalJa8(Number(bearingDeg)) + 'の方角に' + d;
+}
+
+/** 0件のときに案内する範囲（いきなり20kmまで広げる。20km以上なら null） */
+var RANGE_MAX = 20000;
+function widenTargetFor(rangeM) {
+  var n = Number(rangeM);
+  if (!isFinite(n)) return RANGE_MAX;
+  return n < RANGE_MAX ? RANGE_MAX : null;
+}
+
+/** 方位の英字（8方位・正立表示用） */
+function cardinalEn(deg) {
+  var names = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'NW', 'W'];
+  // 22.5度ずつで NE/E/SE... の順になるよう並べ替え
+  var idx = Math.round(wrapDeg(deg) / 45) % 8;
+  return ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'][idx];
+}
+
+/** 方位ラベル（'N 0°' / 'NE 45°'） */
+function bearingLabel(deg) {
+  return cardinalEn(deg) + ' ' + (Math.round(wrapDeg(deg)) % 360) + '°';
+}
+
+/** 地図検索に使う地名（住所から「付近」を落とす） */
+function mapQueryForAddress(address) {
+  var s = String(address === undefined || address === null ? '' : address).trim();
+  if (!s) return '';
+  return s.replace(/付近$/, '').trim();
+}
+
+/** 位置精度の表示（12000 → '12km' / 1500 → '1.5km'） */
+function accuracyLabel(accuracy) {
+  var a = Number(accuracy);
+  if (!isFinite(a) || a <= 0) return '';
+  if (a >= 10000) return Math.round(a / 1000) + 'km';
+  if (a >= 1000) return (Math.round(a / 100) / 10) + 'km';
+  return Math.round(a) + 'm';
+}
+
+/** 位置精度が粗いとき（1000m超）の注記文言 */
+function accuracyNote(accuracy) {
+  var a = Number(accuracy);
+  if (!isFinite(a) || a <= 0) return '';
+  if (a <= 1000) return '';
+  return '現在地の精度が低い（±' + accuracyLabel(a) + '）。位置が実際とずれている可能性があります。';
+}
+
+/**
+ * 煙の横位置をレーン分けして重なりを避ける（純粋関数）。
+ * items: [{ x, w }]（x は画面中央からの距離順に並んでいる前提＝近い順）
+ * 戻り値: 同じ順序の [{ x, lane }]
+ */
+function layoutSmokeLanes(items, gapScale) {
+  var gapRatio = gapScale || 1.15;
+  var placed = [];
+  var out = [];
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i] || { x: 0, w: 10 };
+    var w = Math.max(1, Number(it.w) || 1);
+    var gap = w * ((it.gapScale || gapRatio));
+    var base = Number(it.x) || 0;
+    var chosen = null;
+    var lane = 0;
+    for (var step = 0; step <= 6; step++) {
+      var cands = step === 0 ? [base] : [base + step * gap, base - step * gap];
+      for (var k = 0; k < cands.length; k++) {
+        var c = cands[k];
+        var free = true;
+        for (var j = 0; j < placed.length; j++) {
+          if (Math.abs(placed[j] - c) < gap) { free = false; break; }
+        }
+        if (free) { chosen = c; lane = step === 0 ? 0 : (k === 0 ? step : -step); break; }
+      }
+      if (chosen !== null) break;
+    }
+    if (chosen === null) chosen = base;
+    placed.push(chosen);
+    out.push({ x: chosen, lane: lane });
+  }
+  return out;
+}
+
+/* ===== PURE-END ===== */
+</script>
+
+<!-- ==========================================================================
+     画面のロジック
+     ========================================================================== -->
+<script>
+/* ===== DATA-LAYER-START ===== */
+/* ==========================================================================
+ * A. データ層 — サーバー呼び出しはこのブロックだけ
+ *
+ *    画面 → 同一オリジンの POST /api（Cloudflare Pages Functions）
+ *          → GAS Web アプリの doPost（JSON）→ スプレッドシート
+ *
+ *    GAS の URL はこのファイルに含めない（Cloudflare 側の環境変数だけで持つ）。
+ *    画面側は NoroshiApi.createPost / getNearbyPosts / deletePost しか触らない。
+ *
+ *    返り値の形: { ok:true, ... } / { ok:false, code, message? }
+ * ========================================================================== */
+var NoroshiApi = (function () {
+  'use strict';
+
+  var ENDPOINT = '/api';
+  var TIMEOUT_MS = 25000;
+
+  function call(action, payload) {
+    if (navigator.onLine === false) {
+      return Promise.resolve({ ok: false, code: 'E_OFFLINE' });
+    }
+
+    var controller = null;
+    var timer = null;
+    try {
+      controller = new AbortController();
+    } catch (e) {
+      controller = null;
+    }
+
+    var options = {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: action, payload: payload }),
+      credentials: 'same-origin',
+      cache: 'no-store'
+    };
+    if (controller) {
+      options.signal = controller.signal;
+      timer = window.setTimeout(function () {
+        try { controller.abort(); } catch (e2) {}
+      }, TIMEOUT_MS);
+    }
+
+    function done(res) {
+      if (timer) window.clearTimeout(timer);
+      if (!res || typeof res !== 'object' || typeof res.ok !== 'boolean') {
+        return { ok: false, code: 'E_NETWORK' };
+      }
+      return res;
+    }
+
+    return fetch(ENDPOINT, options)
+      .then(function (response) {
+        if (!response || !response.ok) {
+          return { ok: false, code: 'E_NETWORK' };
+        }
+        return response.json().catch(function () {
+          return { ok: false, code: 'E_NETWORK' };
+        });
+      })
+      .then(done)
+      .catch(function (err) {
+        if (timer) window.clearTimeout(timer);
+        if (err && err.name === 'AbortError') return { ok: false, code: 'E_TIMEOUT' };
+        return { ok: false, code: 'E_NETWORK' };
+      });
+  }
+
+  return {
+    createPost: function (payload) { return call('createPost', payload); },
+    getNearbyPosts: function (payload) { return call('getNearbyPosts', payload); },
+    deletePost: function (payload) { return call('deletePost', payload); },
+    // 詳細（座標・地図は自分の投稿だけ返る）
+    getPostDetail: function (payload) { return call('getPostDetail', payload); }
+  };
+})();
+/* ===== DATA-LAYER-END ===== */
+
+/* ==========================================================================
+ * B. 端末内ストア（IndexedDB）
+ *    保存するのは「自分の投稿ID・秘密キー・端末ID・色履歴20件」だけ。
+ * ========================================================================== */
+var Store = (function () {
+  'use strict';
+
+  var DB_NAME = 'noroshi';
+  var DB_VERSION = 1;
+  var S_POSTS = 'posts';
+  var S_COLORS = 'colors';
+  var S_META = 'meta';
+  var MAX_COLORS = 20;
+
+  var dbPromise = null;
+  var memory = null;
+
+  function mem() {
+    if (!memory) memory = { posts: {}, colors: [], meta: {} };
+    return memory;
+  }
+
+  function idbAvailable() {
+    try {
+      return !!window.indexedDB;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function openDb() {
+    if (dbPromise) return dbPromise;
+    dbPromise = new Promise(function (resolve, reject) {
+      if (!idbAvailable()) {
+        reject(new Error('no-idb'));
+        return;
+      }
+      var req = window.indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function (ev) {
+        var db = ev.target.result;
+        if (!db.objectStoreNames.contains(S_POSTS)) db.createObjectStore(S_POSTS, { keyPath: 'postId' });
+        if (!db.objectStoreNames.contains(S_COLORS)) db.createObjectStore(S_COLORS, { keyPath: 'hex' });
+        if (!db.objectStoreNames.contains(S_META)) db.createObjectStore(S_META, { keyPath: 'key' });
+      };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error || new Error('idb-open')); };
+      req.onblocked = function () { reject(new Error('idb-blocked')); };
+    });
+    return dbPromise;
+  }
+
+  function run(storeName, mode, fn) {
+    return openDb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var value;
+        var tx = db.transaction(storeName, mode);
+        tx.oncomplete = function () { resolve(value); };
+        tx.onerror = function () { reject(tx.error || new Error('idb-tx')); };
+        tx.onabort = function () { reject(tx.error || new Error('idb-abort')); };
+        try {
+          fn(tx.objectStore(storeName), function (v) { value = v; });
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  }
+
+  function randomDeviceId() {
+    var bytes = new Uint8Array(16);
+    window.crypto.getRandomValues(bytes);
+    return bytesToHex(bytes);
+  }
+
+  return {
+    initDeviceId: function () {
+      return run(S_META, 'readwrite', function (store, done) {
+        var req = store.get('deviceId');
+        req.onsuccess = function () {
+          var row = req.result;
+          if (row && row.value) {
+            done(row.value);
+            return;
+          }
+          var id = randomDeviceId();
+          store.put({ key: 'deviceId', value: id });
+          done(id);
+        };
+        req.onerror = function () { done(null); };
+      }).catch(function () {
+        var m = mem();
+        if (!m.meta.deviceId) m.meta.deviceId = randomDeviceId();
+        return m.meta.deviceId;
+      });
+    },
+
+    saveOwnPost: function (rec) {
+      return run(S_POSTS, 'readwrite', function (store, done) {
+        store.put({ postId: rec.postId, secretKey: rec.secretKey, createdAt: rec.createdAt, color: rec.color });
+        done(true);
+      }).catch(function () {
+        mem().posts[rec.postId] = rec;
+        return true;
+      });
+    },
+
+    getOwnPost: function (postId) {
+      return run(S_POSTS, 'readonly', function (store, done) {
+        var req = store.get(postId);
+        req.onsuccess = function () { done(req.result || null); };
+        req.onerror = function () { done(null); };
+      }).catch(function () {
+        return mem().posts[postId] || null;
+      });
+    },
+
+    removeOwnPost: function (postId) {
+      return run(S_POSTS, 'readwrite', function (store, done) {
+        store.delete(postId);
+        done(true);
+      }).catch(function () {
+        delete mem().posts[postId];
+        return true;
+      });
+    },
+
+    listOwnPostIds: function () {
+      return run(S_POSTS, 'readonly', function (store, done) {
+        var req = store.getAllKeys();
+        req.onsuccess = function () { done((req.result || []).slice()); };
+        req.onerror = function () { done([]); };
+      }).catch(function () {
+        return Object.keys(mem().posts);
+      });
+    },
+
+    pruneOwnPosts: function (ttlMs) {
+      var limit = typeof ttlMs === 'number' ? ttlMs : 2 * 60 * 60 * 1000;
+      var cutoff = Date.now() - limit - 10 * 60 * 1000;
+      return run(S_POSTS, 'readwrite', function (store, done) {
+        var req = store.getAll();
+        req.onsuccess = function () {
+          var rows = req.result || [];
+          for (var i = 0; i < rows.length; i++) {
+            var t = Date.parse(rows[i].createdAt || '');
+            if (!isFinite(t) || t < cutoff) store.delete(rows[i].postId);
+          }
+          done(rows.length);
+        };
+        req.onerror = function () { done(0); };
+      }).catch(function () { return 0; });
+    },
+
+    listColors: function () {
+      return run(S_COLORS, 'readonly', function (store, done) {
+        var req = store.getAll();
+        req.onsuccess = function () {
+          var rows = (req.result || []).slice();
+          rows.sort(function (a, b) { return (b.usedAt || 0) - (a.usedAt || 0); });
+          var out = [];
+          for (var i = 0; i < rows.length && out.length < MAX_COLORS; i++) {
+            if (parseHex(rows[i].hex)) out.push(parseHex(rows[i].hex));
+          }
+          done(out);
+        };
+        req.onerror = function () { done([]); };
+      }).catch(function () {
+        return mem().colors.slice(0, MAX_COLORS);
+      });
+    },
+
+    addColor: function (hex) {
+      var norm = parseHex(hex);
+      if (!norm) return Promise.resolve([]);
+      return run(S_COLORS, 'readwrite', function (store, done) {
+        store.put({ hex: norm, usedAt: Date.now() });
+        var req = store.getAll();
+        req.onsuccess = function () {
+          var rows = (req.result || []).slice();
+          rows.sort(function (a, b) { return (b.usedAt || 0) - (a.usedAt || 0); });
+          for (var i = MAX_COLORS; i < rows.length; i++) store.delete(rows[i].hex);
+          var out = [];
+          for (var j = 0; j < rows.length && out.length < MAX_COLORS; j++) out.push(rows[j].hex);
+          done(out);
+        };
+        req.onerror = function () { done([]); };
+      }).catch(function () {
+        var m = mem();
+        m.colors = pushColorHistory(m.colors, norm, MAX_COLORS);
+        return m.colors;
+      });
+    },
+
+    removeColor: function (hex) {
+      var norm = parseHex(hex);
+      if (!norm) return Promise.resolve([]);
+      return run(S_COLORS, 'readwrite', function (store, done) {
+        store.delete(norm);
+        done(true);
+      }).then(function () {
+        return Store.listColors();
+      }).catch(function () {
+        var m = mem();
+        m.colors = m.colors.filter(function (h) { return h !== norm; });
+        return m.colors;
+      });
+    },
+
+    clearColors: function () {
+      return run(S_COLORS, 'readwrite', function (store, done) {
+        store.clear();
+        done(true);
+      }).then(function () { return []; }).catch(function () {
+        mem().colors = [];
+        return [];
+      });
+    }
+  };
+})();
+
+/* ==========================================================================
+ * C. 文言・定数・小さなヘルパ
+ * ========================================================================== */
+
+var CLIENT_MESSAGES = {
+  E_OFFLINE: 'インターネットに接続されていません。接続を確認して、もう一度お試しください。',
+  E_NETWORK: '通信に失敗しました。投稿はできていません。電波の良い場所で、もう一度お試しください。',
+  E_LIST_NETWORK: '通信に失敗しました。近くののろしを取得できませんでした。電波の良い場所で、もう一度お試しください。',
+  E_TIMEOUT: '通信がタイムアウトしました。投稿できたか確認できません。一覧を更新して確認してください。',
+  E_QUOTA: 'ただいま利用が集中しています。時間をおいて、もう一度お試しください。',
+  E_BUSY: '混み合っています。少し時間をおいて、もう一度お試しください。',
+  E_DATA: 'いまデータを読み書きできません。時間をおいて、もう一度お試しください。',
+  E_INTERNAL: '処理に失敗しました。時間をおいて、もう一度お試しください。',
+  E_VALIDATION: '入力内容が正しくありません。',
+  E_TOO_LARGE: '送信されたデータが大きすぎます。',
+  E_INTERVAL: '投稿の間隔が短すぎます。少し待ってから、もう一度お試しください。',
+  E_ACTIVE_LIMIT: '投稿できる件数の上限（20件）に達しました。どれかが消えるのを待つか、自分で「消す」を押してください。',
+  E_DELETE: '削除できませんでした。この投稿はすでに消えているか、削除できません。'
+};
+
+var GEO_MESSAGES = {
+  denied: '位置情報の利用が許可されていません。ブラウザの設定でこのページの位置情報を許可してから、もう一度お試しください。',
+  unavailable: '現在地を取得できませんでした。電波の良い場所で、もう一度お試しください。',
+  timeout: '位置情報の取得に時間がかかっています。もう一度お試しください。',
+  unsupported: 'このブラウザでは位置情報を利用できません。別のブラウザでお試しください。'
+};
+
+var APP = {
+  ttlMs: 2 * 60 * 60 * 1000,
+  tickMs: 10000,
+  refreshMs: 60000,
+  positionFreshMs: 30000,
+  fovDeg: 130,
+  postRetryHint: '\nもう一度「この色でのろしを上げる」を押してください。'
+};
+
+var ASSET_SRC = {
+  // ?v= はキャッシュ更新用（/img/* は1年 immutable で配信するため、絵を差し替えたら上げる）
+  morning: 'img/bg-morning.webp?v=2',
+  day: 'img/bg-day.webp?v=2',
+  evening: 'img/bg-evening.webp?v=2',
+  night: 'img/bg-night.webp?v=2',
+  preview: 'img/preview.webp'
+};
+
+/* 時間帯ごとの空の明るさ（煙の縁取り色を決めるのに使う） */
+var SKY_LUMA = { morning: 0.70, day: 0.74, evening: 0.52, night: 0.12 };
+
+function messageFor(res) {
+  if (res && res.message) return res.message;
+  if (res && CLIENT_MESSAGES[res.code]) return CLIENT_MESSAGES[res.code];
+  return CLIENT_MESSAGES.E_INTERNAL;
+}
+
+function serverNow() {
+  return Date.now() + (state.serverOffsetMs || 0);
+}
+
+function clampNum(n, lo, hi) {
+  return Math.min(hi, Math.max(lo, n));
+}
+
+function elById(id) {
+  return document.getElementById(id);
+}
+
+function loadImage(src) {
+  var img = new Image();
+  img.src = src;
+  return img;
+}
+
+/* ---- 焚き火の描画（風景とプレビューで共通） ---- */
+/* ---- 焚き火（ピクセル調の複数火炎・薪・外炎/内炎） ---- */
+function flickerAt(t, seed) {
+  return 1 + 0.13 * Math.sin(t * 7.1 + seed) + 0.07 * Math.sin(t * 13.7 + seed * 2.3);
+}
+
+function drawCampfire(g2d, cx, baseY, unit, rgb, t, seed, still) {
+  if (unit < 3) return;
+  var u = Math.max(1, unit);
+  var dark = mixRgb(rgb, { r: 8, g: 6, b: 12 }, 0.55);
+  var mid = rgb;
+  var inner = mixRgb(rgb, { r: 255, g: 246, b: 214 }, 0.72);
+
+  // 薪（2本を交差）
+  g2d.strokeStyle = '#3a2718';
+  g2d.lineCap = 'round';
+  g2d.lineWidth = Math.max(2, u * 0.22);
+  g2d.beginPath();
+  g2d.moveTo(cx - u * 0.72, baseY + u * 0.16);
+  g2d.lineTo(cx + u * 0.72, baseY - u * 0.1);
+  g2d.stroke();
+  g2d.beginPath();
+  g2d.moveTo(cx - u * 0.66, baseY - u * 0.06);
+  g2d.lineTo(cx + u * 0.7, baseY + u * 0.2);
+  g2d.stroke();
+  // 燃えさし
+  g2d.fillStyle = rgbaOf(mixRgb(rgb, { r: 255, g: 150, b: 40 }, 0.45), 0.85);
+  g2d.fillRect(Math.round(cx - u * 0.5), Math.round(baseY + u * 0.1), Math.max(2, Math.round(u * 0.3)), 2);
+  g2d.fillRect(Math.round(cx + u * 0.22), Math.round(baseY + u * 0.04), Math.max(2, Math.round(u * 0.26)), 2);
+
+  // 炎（中央が高く、左右に小さな炎。外炎→内炎の3層）
+  var tongues = [
+    { dx: 0, h: 1.95, w: 0.5, a: 1, tint: 0 },
+    { dx: -0.34, h: 1.28, w: 0.36, a: 0.92, tint: 0.12 },
+    { dx: 0.34, h: 1.16, w: 0.34, a: 0.9, tint: 0.16 },
+    { dx: -0.14, h: 0.82, w: 0.24, a: 0.8, tint: 0.3 },
+    { dx: 0.18, h: 0.7, w: 0.22, a: 0.78, tint: 0.34 }
+  ];
+  for (var i = 0; i < tongues.length; i++) {
+    var tg = tongues[i];
+    var fl = flickerAt(t + i * 0.7, seed + i * 1.9);
+    var hh = u * tg.h * fl;
+    var ww = u * tg.w;
+    var x0 = cx + u * tg.dx;
+    var layers = [
+      { col: rgbaOf(mixRgb(dark, mid, tg.tint), 0.95), k: 1 },
+      { col: rgbaOf(mixRgb(mid, inner, 0.16 + tg.tint), 0.95), k: 0.66 },
+      { col: rgbaOf(inner, 0.9), k: 0.34 }
+    ];
+    for (var L = 0; L < layers.length; L++) {
+      var lay = layers[L];
+      var layerH = hh * (1 - L * 0.26);
+      var rows = Math.round(layerH / 2);
+      for (var r = 0; r <= rows; r++) {
+        var pp = r / Math.max(1, rows);
+        var prof = Math.sin(Math.PI * Math.pow(pp, 0.72)) * (1 - pp * 0.18);
+        var wpx = ww * lay.k * Math.max(0.12, prof);
+        var wob = Math.sin(pp * 3.6 + t * 4.4 + seed + i) * u * 0.1 * pp;
+        var y = baseY - layerH * pp;
+        g2d.fillStyle = lay.col;
+        g2d.fillRect(Math.round(x0 + wob - wpx / 2), Math.round(y), Math.max(1, Math.round(wpx)), 2);
+      }
+    }
+  }
+  // 火花
+  var sp = still ? 0 : 1;
+  for (var k = 0; k < 3; k++) {
+    var ph = ((t * 0.5 + k * 0.37 + seed) % 1);
+    if (!sp) ph = 0.5;
+    g2d.fillStyle = rgbaOf(inner, 0.85 * (1 - ph));
+    g2d.fillRect(Math.round(cx + Math.sin(seed + k * 2.1) * u * 0.5), Math.round(baseY - u * (1.1 + ph * 1.6)), 2, 2);
+  }
+}
+
+
+/* ---- 煙の柱（風景ののろしとプレビューで共通。幅はunit比例、topYで柱の上端を指定） ---- */
+function drawSmokeColumn(g2d, fx, fireY, unit, t, rgb, topY) {
+  var puffs = 30;
+  if (topY === undefined || topY === null) topY = -unit * 1.2;
+  for (var i = 0; i < puffs; i++) {
+    var ph = i / (puffs - 1);
+    var y = fireY - unit * 0.75 + (topY - fireY + unit * 0.75) * ph;
+    var wob = Math.sin(ph * 4.4 + t * 0.5) * unit * (0.12 + ph * 0.95)
+            + Math.sin(ph * 9.2 - t * 0.3) * unit * ph * 0.28;
+    var x = fx + wob;
+    var r = unit * (0.26 + ph * 0.62) * (0.9 + 0.18 * Math.sin(i * 2.7));
+    var a = 0.34 * Math.min(1, ph * 3.2) * Math.pow(1 - ph, 1.1);
+    if (a <= 0.012) continue;
+    var col = mixRgb(rgb, { r: 240, g: 244, b: 255 }, 0.18 + ph * 0.42);
+    var g2 = g2d.createRadialGradient(x, y, 0, x, y, r);
+    g2.addColorStop(0, rgbaOf(col, a));
+    g2.addColorStop(0.55, rgbaOf(col, a * 0.6));
+    g2.addColorStop(1, rgbaOf(col, 0));
+    g2d.fillStyle = g2;
+    g2d.beginPath();
+    g2d.arc(x, y, r, 0, Math.PI * 2);
+    g2d.fill();
+  }
+}
+
+/* ==========================================================================
+ * D. 風景（360°パノラマ + 煙 + 方位計）
+ * ========================================================================== */
+
+var Scene = (function () {
+  'use strict';
+
+  var canvas = null;
+  var ctx = null;
+  var compassCanvas = null;
+  var compassCtx = null;
+  var W = 1;
+  var H = 1;
+  var dpr = 1;
+  var period = 'night';
+  var heading = 0;
+  var posts = [];
+  var sprites = {};
+  var images = {};
+  var reduceMotion = false;
+  var lastCompassDeg = -999;
+  // 時間帯の切替はクロスフェード（フェード中だけ旧画像を1枚多く描く。画像の追加はなし）
+  var FADE_MS = 4000;
+  var fadeFrom = null;
+  var fadeStart = 0;
+  try {
+    var _fadeOpt = parseFloat(new URLSearchParams(location.search).get('fade'));
+    if (isFinite(_fadeOpt) && _fadeOpt >= 0) FADE_MS = _fadeOpt;   // 検証用 ?fade=0 で即時切替
+  } catch (eFade) {}
+  function easeFade(k) { return k <= 0 ? 0 : (k >= 1 ? 1 : k * k * (3 - 2 * k)); }
+  function fadeK() {
+    if (!fadeFrom) return 1;
+    var k = (Date.now() - fadeStart) / FADE_MS;
+    if (!(k < 1)) { fadeFrom = null; return 1; }
+    return k > 0 ? k : 0;
+  }
+  // 画像の継ぎ目（左右端）が正面（北）に来ないように90度ずらす
+  var PANORAMA_OFFSET = 45;
+  var scratch = null;
+  var ready = false;
+  var lastPlumeXs = [];
+  var showCelestial = true;
+  var lastPlumeBases = [];
+  // CTAなどで隠れる下端の高さ（煙の根元をこの上に置く）
+  var groundInset = 0;
+
+  // 天体は画像に焼き込まず、コードで1つだけ描く（反転タイルで増えないように）
+  var CELESTIAL = {
+    morning: { deg: 18, y: 0.31, r: 0.048, core: '#fff6d8', halo: [255, 226, 170] },
+    day: { deg: 38, y: 0.30, r: 0.044, core: '#ffffff', halo: [214, 238, 255] },
+    evening: { deg: 10, y: 0.32, r: 0.048, core: '#ffe6b4', halo: [255, 176, 96] },
+    night: { deg: 24, y: 0.26, r: 0.044, core: '#f6f9ff', halo: [186, 208, 255] }
+  };
+
+  function init(canvasEl, compassEl, opts) {
+    canvas = canvasEl;
+    compassCanvas = compassEl;
+    ctx = canvas.getContext('2d');
+    compassCtx = compassCanvas.getContext('2d');
+    reduceMotion = !!(opts && opts.reduceMotion);
+    scratch = document.createElement('canvas');
+    scratch.width = 40;
+    scratch.height = 56;
+    Object.keys(ASSET_SRC).forEach(function (key) {
+      var img = loadImage(ASSET_SRC[key]);
+      images[key] = img;
+      if (key !== 'preview') {
+        img.onload = function () { ready = true; };
+      }
+    });
+    resize();
+  }
+
+  function resize() {
+    if (!canvas) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    var rect = canvas.getBoundingClientRect();
+    W = Math.max(1, Math.round(rect.width));
+    H = Math.max(1, Math.round(rect.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    var cs = compassCanvas.getBoundingClientRect();
+    compassCanvas.width = Math.round((cs.width || 46) * dpr);
+    compassCanvas.height = Math.round((cs.height || 46) * dpr);
+    lastCompassDeg = -999;
+    drawStatic();
+  }
+
+  function setPeriod(p) {
+    if (period === p) return;
+    var prev = period;
+    period = p;
+    if (FADE_MS > 0 && !reduceMotion && images[prev] && images[p]) {
+      fadeFrom = prev;
+      fadeStart = Date.now();
+    } else {
+      fadeFrom = null;
+    }
+    drawStatic();
+  }
+
+  function getPeriod() {
+    return period;
+  }
+
+  function setPosts(list) {
+    posts = list || [];
+  }
+
+  function setGroundInset(px) {
+    var v = Math.max(0, Number(px) || 0);
+    if (Math.abs(v - groundInset) < 0.5) return;
+    groundInset = v;
+    drawStatic();
+  }
+
+  function getHeading() {
+    return heading;
+  }
+
+  function setHeading(deg) {
+    heading = wrapDeg(deg);
+  }
+
+  // パノラマは画像の全幅が1周（360°）。継ぎ目は画像側でなじませてあるので、
+  // 窓を切り出したり鏡像反転したりせず、そのまま360°周期で敷き詰める。
+  /** パノラマのスケール（タイル1枚 = 360°）。等倍で描いて縦線・横帯を出さない */
+  function metrics() {
+    var img = images[period];
+    var iw = (img && img.naturalWidth) || 1248;
+    var ih = (img && img.naturalHeight) || 832;
+    // ピクセルアートは**等倍（1:1）**で描く。中途半端な倍率だと行の重複・脱落が起き、
+    // 稜線など横に長い線が「横に伸びた帯」に見えるため（実測で確認）。
+    // 等倍にすると、見える角度（FOV）は画面幅で決まる（375px ≒ 108°、560px ≒ 161°）。
+    return {
+      srcX: 0, srcY: 0, srcW: iw, srcH: ih,
+      tileW: iw, tileH: ih,
+      ppd: iw / 360,
+      dy: Math.round((H - ih) / 2)
+    };
+  }
+
+  /* ---- 月相シンクロ(SunCalc 1.9.0 / クライアント完結・外部API不要 / 低負荷) ----
+     - 計算はページロード時+10分ごとのみ。毎フレームのライブラリ呼び出しゼロ。
+     - 位置情報は許可されれば実測値、拒否/非対応なら東京を既定使用(24hキャッシュ)。
+     - 月相(phase/fraction)は同一瞬間なら世界中で共通。座標は方位・高度の算出にのみ使用。
+     - 検証用URLパラメータ(通常アクセスでは無効): ?mf=0-1&mw=1|0&malt=度&maz=度&mup=1&mrot=度 */
+  var MoonSync = (function () {
+    'use strict';
+    var DEFAULT_LOC = { lat: 35.6812, lng: 139.7671 };
+    var CACHE_KEY = 'noroshi_moon_loc_v1';
+    var REFRESH_MS = 10 * 60 * 1000;
+    var q = null;
+    try { q = new URLSearchParams(location.search); } catch (e) { q = null; }
+    function opt(name) { return q && q.has(name) ? q.get(name) : null; }
+    function rad2deg(r) { return r * 180 / Math.PI; }
+    var loc = null;
+    var state = null;
+    function loadCachedLoc() {
+      try {
+        var s = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+        if (s && isFinite(s.lat) && isFinite(s.lng) && Date.now() - s.t < 24 * 3600e3) return s;
+      } catch (e) {}
+      return null;
+    }
+    function saveCachedLoc(l) {
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify({ lat: l.lat, lng: l.lng, t: Date.now() })); } catch (e) {}
+    }
+    function computeState(now) {
+      if (!window.SunCalc || !loc) return null;
+      var d = (now instanceof Date) ? now : new Date();
+      var mi = SunCalc.getMoonIllumination(d);
+      var mp = SunCalc.getMoonPosition(d, loc.lat, loc.lng);
+      var sp = SunCalc.getPosition(d, loc.lat, loc.lng);
+      var altDeg = rad2deg(mp.altitude);
+      var azDeg = (rad2deg(mp.azimuth) + 180 + 360) % 360;
+      var waxing = (typeof mi.waxing === 'boolean') ? mi.waxing : (mi.phase < 0.5);
+      var rotDeg = (typeof mi.angle === 'number' ? mi.angle : 0) -
+        (typeof mp.parallacticAngle === 'number' ? rad2deg(mp.parallacticAngle) : 0);
+      var st = {
+        phase: mi.phase,
+        fraction: mi.fraction,
+        waxing: waxing,
+        rotDeg: rotDeg,
+        altDeg: altDeg,
+        azDeg: azDeg,
+        sunAzDeg: (rad2deg(sp.azimuth) + 180 + 360) % 360,
+        sunAltDeg: rad2deg(sp.altitude),
+        up: altDeg > -0.5
+      };
+      var mf = parseFloat(opt('mf'));
+      if (isFinite(mf)) { st.fraction = Math.max(0, Math.min(1, mf)); st.up = true; }
+      if (opt('mw') === '0') st.waxing = false;
+      if (opt('mw') === '1') st.waxing = true;
+      var malt = parseFloat(opt('malt'));
+      if (isFinite(malt)) st.altDeg = malt;
+      var maz = parseFloat(opt('maz'));
+      if (isFinite(maz)) st.azDeg = ((maz % 360) + 360) % 360;
+      if (opt('mup') === '1') st.up = true;
+      return st;
+    }
+    function refresh() { state = computeState(null); }
+    function init() {
+      loc = loadCachedLoc() || DEFAULT_LOC;
+      refresh();
+      if (navigator.geolocation) {
+        try {
+          navigator.geolocation.getCurrentPosition(function (pos) {
+            loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            saveCachedLoc(loc);
+            refresh();
+          }, function () { saveCachedLoc(loc); }, { timeout: 4000, maximumAge: 1800e3, enableHighAccuracy: false });
+        } catch (e) {}
+      }
+      setInterval(refresh, REFRESH_MS);
+    }
+    init();
+    window.MoonSync = { get: function () { return state; }, refreshNow: function () { refresh(); return state; }, location: function () { return loc; } };
+    return window.MoonSync;
+  })();
+
+  /* ---- 日の出・日の入り同期（SunCalc は同梱済み・外部通信なし） ---- */
+  var SunSync = (function () {
+    'use strict';
+    var DEFAULT_LOC = { lat: 35.6812, lng: 139.7671 };
+    var cacheKey = null;
+    var cacheTimes = null;
+    var nullKey = null;
+    function loc() {
+      var l = (window.MoonSync && window.MoonSync.location) ? window.MoonSync.location() : null;
+      return (l && isFinite(l.lat) && isFinite(l.lng)) ? l : DEFAULT_LOC;
+    }
+    function timesFor(date) {
+      if (!window.SunCalc || !window.SunCalc.getTimes) return null;
+      var l = loc();
+      var key = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate()
+        + '@' + l.lat.toFixed(2) + ',' + l.lng.toFixed(2);
+      if (key === cacheKey) return cacheTimes;
+      if (key === nullKey) return null;
+      var t = null;
+      try { t = window.SunCalc.getTimes(date, l.lat, l.lng); } catch (e) { t = null; }
+      // 白夜・極夜などで Invalid Date が返る場合は判定不能として null（呼び側が時刻ベースへ退避）
+      if (!t || !isFinite(+t.dawn) || !isFinite(+t.goldenHourEnd) || !isFinite(+t.goldenHour) || !isFinite(+t.dusk)) {
+        cacheKey = null; cacheTimes = null; nullKey = key;
+        return null;
+      }
+      cacheKey = key;
+      cacheTimes = t;
+      nullKey = null;
+      return t;
+    }
+    /* dawn(-6°)→朝 / goldenHourEnd(高度+6°)→昼 / goldenHour→夕 / dusk(-6°)→夜 */
+    function periodAt(now) {
+      var d = (now instanceof Date) ? now : new Date();
+      var t = timesFor(d);
+      if (!t) return null;
+      var ts = d.getTime();
+      if (ts >= +t.dawn && ts < +t.goldenHourEnd) return 'morning';
+      if (ts >= +t.goldenHourEnd && ts < +t.goldenHour) return 'day';
+      if (ts >= +t.goldenHour && ts < +t.dusk) return 'evening';
+      return 'night';
+    }
+    return {
+      periodAt: periodAt,
+      times: function (d) { return timesFor(d || new Date()); },
+      location: loc
+    };
+  })();
+
+  function drawCelestial(pp, alpha) {
+    pp = pp || period;
+    var c = CELESTIAL[pp];
+    if (!c || !showCelestial) return;
+    ctx.globalAlpha = (alpha === undefined) ? 1 : alpha;
+    var m = metrics();
+    var deg = c.deg;
+    var y = c.y;
+    var r = Math.max(8, Math.round(H * c.r));
+    var moon = (pp === 'night') ? MoonSync.get() : null;
+    if (moon) {
+      if (!moon.up) return;
+      deg = moon.azDeg;
+      y = Math.max(0.30, Math.min(0.66, 0.62 - (moon.altDeg / 60) * 0.44));
+    }
+    var dx = angleDelta(deg, heading);
+    var x = Math.round(W / 2 + dx * m.ppd);
+    y = Math.round(H * y);
+    if (x < -r * 6 || x > W + r * 6) return;
+    var halo = c.halo;
+    var glowK = moon ? (0.45 + 0.55 * moon.fraction) : 1;
+    var g = ctx.createRadialGradient(x, y, r * 0.6, x, y, r * 5.2);
+    g.addColorStop(0, 'rgba(' + halo[0] + ',' + halo[1] + ',' + halo[2] + ',' + (0.42 * glowK).toFixed(3) + ')');
+    g.addColorStop(0.35, 'rgba(' + halo[0] + ',' + halo[1] + ',' + halo[2] + ',' + (0.14 * glowK).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(' + halo[0] + ',' + halo[1] + ',' + halo[2] + ',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 5.2, 0, Math.PI * 2);
+    ctx.fill();
+    if (moon) {
+      var yUn = 0.62 - (moon.altDeg / 60) * 0.44;
+      var dxs = (angleDelta(moon.sunAzDeg, heading) - angleDelta(moon.azDeg, heading)) * m.ppd;
+      var dys = ((0.62 - (moon.sunAltDeg / 60) * 0.44) - yUn) * H;
+      var mq = null; try { mq = new URLSearchParams(location.search); } catch (eDraw) { mq = null; }
+      var mrf = mq ? parseFloat(mq.get('mrot')) : NaN;
+      var rot = isFinite(mrf) ? mrf : Math.atan2(dys, dxs) * 180 / Math.PI;
+      drawMoonDisc(x, y, r, moon, c.core, rot);
+    } else {
+      ctx.fillStyle = c.core;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.82, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  // 月ディスク(満ち欠けつき): 暗部=地球照の淡い円 / 明部=半円+終端楕円 / クレーターは明部のみ
+  function drawMoonDisc(x, y, r, moon, core, rot) {
+    var f = Math.max(0, Math.min(1, moon.fraction));
+    var rx = r * Math.abs(1 - 2 * f);
+    window.__moonDraw = { f: f, rx: rx, rot: rot, x: x, y: y, r: r };
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate((rot || 0) * Math.PI / 180);
+    ctx.fillStyle = 'rgba(214,224,244,0.16)';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    if (f >= 0.5) {
+      ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
+      ctx.ellipse(0, 0, rx, r, 0, Math.PI / 2, Math.PI * 1.5, false);
+    } else {
+      ctx.arc(0, 0, r, Math.PI / 2, -Math.PI / 2, true);
+      ctx.ellipse(0, 0, rx, r, 0, -Math.PI / 2, Math.PI / 2, false);
+    }
+    ctx.closePath();
+    ctx.fillStyle = core;
+    ctx.fill();
+    ctx.save();
+    ctx.clip();
+    ctx.fillStyle = 'rgba(198,214,246,0.5)';
+    ctx.beginPath();
+    ctx.arc(-r * 0.3, -r * 0.22, r * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.26, r * 0.18, r * 0.17, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(r * 0.12, -r * 0.42, r * 0.11, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  }
+
+  function drawFallbackSky(pp) {
+    var sky = {
+      morning: ['#f6c79a', '#d98fa0', '#7d6a9e'],
+      day: ['#8ecdf0', '#7bb6dd', '#5e8fb8'],
+      evening: ['#ffb46b', '#b8698f', '#4a3468'],
+      night: ['#0a1026', '#141c3c', '#251a3f']
+    }[pp || period] || ['#0a1026', '#141c3c', '#251a3f'];
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, sky[0]);
+    g.addColorStop(0.6, sky[1]);
+    g.addColorStop(1, sky[2]);
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  function drawPanorama(pp, alpha) {
+    pp = pp || period;
+    if (alpha !== undefined) ctx.globalAlpha = alpha;
+    var img = images[pp];
+    if (!img || !img.complete || !img.naturalWidth) {
+      drawFallbackSky(pp);
+      ctx.globalAlpha = 1;
+      return;
+    }
+    var m = metrics();
+    var base = wrapDeg(heading) - PANORAMA_OFFSET;
+    var half = (W / 2) / m.ppd;
+    var jMin = Math.floor((base - half) / 360) - 1;
+    var jMax = Math.ceil((base + half) / 360) + 1;
+
+    // ピクセルアートを拡大するので、補間は切る（にじみ・帯を出さない）
+    ctx.imageSmoothingEnabled = false;
+    for (var j = jMin; j <= jMax; j++) {
+      var x = Math.round(W / 2 + (j * 360 - base) * m.ppd);
+      if (x > W || x + m.tileW < 0) continue;
+      // 画像が1周ぶんつながっているので、反転も窓の切り出しもせずに敷く
+      ctx.drawImage(img, m.srcX, m.srcY, m.srcW, m.srcH, x, m.dy, m.tileW, m.tileH);
+    }
+    ctx.imageSmoothingEnabled = true;
+    ctx.globalAlpha = 1;
+  }
+
+  /* ---- 煙のスプライト（色ごとにキャッシュ・低解像度で描いて拡大＝ピクセル調） ---- */
+  var SPRITE_W = 26;
+  var SPRITE_H = 74;
+
+  function noiseHash(x, y, seed) {
+    var n = Math.sin((x * 12.9898 + y * 78.233 + seed * 37.719)) * 43758.5453;
+    return n - Math.floor(n);
+  }
+
+  function plumeSprite(hex) {
+    if (sprites[hex]) return sprites[hex];
+    var c = document.createElement('canvas');
+    c.width = SPRITE_W;
+    c.height = SPRITE_H;
+    var g = c.getContext('2d');
+    var rgb = hexToRgb(hex) || { r: 255, g: 122, b: 69 };
+    var skyL = SKY_LUMA[period] === undefined ? 0.5 : SKY_LUMA[period];
+    var sky = { r: Math.round(skyL * 255), g: Math.round(skyL * 255), b: Math.round(skyL * 244) };
+    var seed = (rgb.r * 7 + rgb.g * 13 + rgb.b * 29) % 97;
+    var cx = SPRITE_W / 2;
+
+    // 下から上へ、渦を巻きながら広がる「かたまり」を重ねて煙の輪郭を作る。
+    // 4本の柱を少しずつずらして重ね、単調な筒に見えないようにする。
+    var columns = [
+      { off: 0.0, ph: 0.0, seed: 0.0, scale: 1.0 },
+      { off: -0.9, ph: 1.1, seed: 2.3, scale: 0.82 },
+      { off: 0.8, ph: 2.2, seed: 4.7, scale: 0.88 },
+      { off: 0.2, ph: 3.4, seed: 7.1, scale: 0.66 }
+    ];
+    var clumps = 24;
+    for (var ci = 0; ci < columns.length; ci++) {
+      var cc = columns[ci];
+      for (var i = 0; i < clumps; i++) {
+        var q = i / (clumps - 1);
+        var bend = Math.sin(q * 4.2 - 0.5 + cc.ph) * (0.5 + q * 3.8) + Math.sin(q * 8.7 + 1.4 + cc.ph) * q * 1.5;
+        var cy = (SPRITE_H - 3) - Math.pow(q, 0.94) * (SPRITE_H - 8);
+        var rad = (2.2 + q * 5.6) * cc.scale * (0.72 + 0.62 * noiseHash(i + ci, 5, seed));
+        var alpha = 0.92 * (1 - Math.pow(q, 1.5)) * Math.min(1, 0.5 + q * 3.0);
+        if (q > 0.82) alpha *= Math.max(0, (1 - q) / 0.18);
+        alpha *= ci === 0 ? 1 : 0.72;
+        if (alpha <= 0.03) continue;
+        var col = mixRgb(rgb, sky, 0.08 + q * 0.36);
+        var cxp = cx + bend + cc.off * (0.6 + q * 2.4);
+        var x0 = Math.max(0, Math.floor(cxp - rad));
+        var x1 = Math.min(SPRITE_W - 1, Math.ceil(cxp + rad));
+        var y0 = Math.max(0, Math.floor(cy - rad));
+        var y1 = Math.min(SPRITE_H - 1, Math.ceil(cy + rad));
+        for (var y = y0; y <= y1; y++) {
+          for (var x = x0; x <= x1; x++) {
+            var dd = Math.sqrt((x - cxp) * (x - cxp) + (y - cy) * (y - cy)) / rad;
+            if (dd > 1) continue;
+            var dens = Math.pow(1 - dd * dd, 0.5);
+            var grain = noiseHash(x * 5 + 2, y * 3 + 1, seed + cc.seed);
+            if (grain > 0.16 + dens * 1.18) continue;    // 輪郭を粒状に
+            g.fillStyle = rgbaOf(col, Math.min(0.93, alpha * (0.45 + dens * 0.65)));
+            g.fillRect(x, y, 1, 1);
+          }
+        }
+      }
+    }
+    sprites[hex] = c;
+    return c;
+  }
+
+  function drawSmoke(t) {
+    if (!posts.length) return;
+    var m = metrics();
+    var vis = [];
+    for (var i = 0; i < posts.length; i++) {
+      var p = posts[i];
+      var bearing = (p.bearingDeg === null || p.bearingDeg === undefined) ? 0 : p.bearingDeg;
+      var dx = angleDelta(bearing, heading);
+      var x = W / 2 + dx * m.ppd;
+      var size = distanceToSmoke(p.distanceM, H);
+      var dw = size.w * 4.2;
+      if (x + dw < -W || x - dw > W * 2) continue;
+      vis.push({ p: p, x: x, size: size, dw: dw, seed: i * 1.37 });
+    }
+    if (!vis.length) return;
+
+    // 同じ方位付近はレーン分けして横に並べる（近い順は崩さない）
+    var lanes = layoutSmokeLanes(vis.map(function (v) { return { x: v.x, w: v.dw }; }), 1.18);
+    lastPlumeXs = lanes.map(function (l) { return l.x; });
+    lastPlumeBases = vis.map(function (v) {
+      var bob = reduceMotion ? 0 : Math.sin(t * 0.85 + v.seed * 0.7) * v.size.h * 0.012;
+      return Math.min(H * v.size.base, H - groundInset) + bob;
+    });
+
+    ctx.imageSmoothingEnabled = false;
+    // のろしの煙+根元の焚き火（のろしをあげる画面とデザイン統一:
+    // ソフトなグラデーション煙 drawSmokeColumn + 共通焚き火 drawCampfire）
+    for (var k = 0; k < vis.length; k++) {
+      var w2 = vis[k];
+      var bob = reduceMotion ? 0 : Math.sin(t * 0.85 + w2.seed * 0.7) * w2.size.h * 0.012;
+      var baseY = Math.min(H * w2.size.base, H - groundInset) + bob;
+      var unit = Math.max(5, w2.size.w * 0.8);
+      var rgbP = hexToRgb(w2.p.color) || { r: 255, g: 122, b: 69 };
+      ctx.globalAlpha = Math.max(0.35, Math.min(1, w2.size.alpha + 0.15));
+      // 煙: 高さは従来どおり size.h（遠くののろしは短く）。幅は unit 比例で投稿画面と同じ見た目
+      drawSmokeColumn(ctx, lanes[k].x, baseY, unit, reduceMotion ? 1.7 : t, rgbP, baseY - w2.size.h);
+      drawCampfire(ctx, lanes[k].x, baseY, unit, rgbP, reduceMotion ? 1.7 : t, w2.seed, reduceMotion);
+      ctx.globalAlpha = 1;
+    }
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  function drawCompass() {
+    var cw = compassCanvas.width;
+    var ch = compassCanvas.height;
+    if (!cw || !ch) return;
+    var r = cw / 2;
+    var cx = r;
+    var cy = r;
+    var c = compassCtx;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, cw, ch);
+
+    c.beginPath();
+    c.arc(cx, cy, r - 1, 0, Math.PI * 2);
+    c.fillStyle = 'rgba(8,11,22,.46)';
+    c.fill();
+    c.lineWidth = Math.max(1, dpr * 0.7);
+    c.strokeStyle = 'rgba(255,255,255,.34)';
+    c.stroke();
+
+    // 8方位の目盛り（45度ごと）
+    for (var i = 0; i < 8; i++) {
+      var a = (i * 45 - heading - 90) * Math.PI / 180;
+      var inner = i % 2 === 0 ? r - 8 : r - 6;
+      c.beginPath();
+      c.moveTo(cx + Math.cos(a) * inner, cy + Math.sin(a) * inner);
+      c.lineTo(cx + Math.cos(a) * (r - 3), cy + Math.sin(a) * (r - 3));
+      c.strokeStyle = i % 2 === 0 ? 'rgba(255,255,255,.55)' : 'rgba(255,255,255,.3)';
+      c.lineWidth = Math.max(1, dpr * 0.7);
+      c.stroke();
+    }
+
+    // N/E/S/W を「正立」で置く（回転させない）
+    var marks = [
+      { deg: 0, text: 'N', color: '#ffb765' },
+      { deg: 90, text: 'E', color: 'rgba(255,255,255,.9)' },
+      { deg: 180, text: 'S', color: 'rgba(255,255,255,.9)' },
+      { deg: 270, text: 'W', color: 'rgba(255,255,255,.9)' }
+    ];
+    c.font = '800 ' + Math.round(r * 0.34) + 'px system-ui, -apple-system, "Segoe UI", sans-serif';
+    c.textAlign = 'center';
+    c.textBaseline = 'middle';
+    for (var k = 0; k < marks.length; k++) {
+      var b = (marks[k].deg - heading - 90) * Math.PI / 180;
+      var lx = cx + Math.cos(b) * (r * 0.56);
+      var ly = cy + Math.sin(b) * (r * 0.56);
+      c.lineWidth = Math.max(2, dpr * 1.6);
+      c.strokeStyle = 'rgba(8,11,22,.75)';
+      c.strokeText(marks[k].text, lx, ly);
+      c.fillStyle = marks[k].color;
+      c.fillText(marks[k].text, lx, ly);
+    }
+
+    // 視線（いま見ている方向＝常に真上。文字と重ならないよう外周の小さな三角）
+    c.beginPath();
+    c.moveTo(cx, cy - r + 1);
+    c.lineTo(cx - r * 0.1, cy - r + 1 + r * 0.17);
+    c.lineTo(cx + r * 0.1, cy - r + 1 + r * 0.17);
+    c.closePath();
+    c.fillStyle = '#fff';
+    c.fill();
+  }
+
+  function draw(t) {
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var k = fadeK();
+    if (fadeFrom) {
+      // 旧時間帯を下敷きに、新時間帯をαで重ねる（FADE_MS かけて入れ替え）
+      drawPanorama(fadeFrom, 1);
+      drawPanorama(period, easeFade(k));
+      drawCelestial(fadeFrom, 1);
+      drawCelestial(period, easeFade(k));
+    } else {
+      drawPanorama(period, 1);
+      drawCelestial(period, 1);
+    }
+    ctx.globalAlpha = 1;
+    drawSmoke(t || 0);
+    if (Math.abs(wrapDeg(heading) - lastCompassDeg) > 0.2) {
+      lastCompassDeg = wrapDeg(heading);
+      drawCompass();
+    }
+  }
+
+  function drawStatic() {
+    draw(0);
+  }
+
+  return {
+    init: init,
+    resize: resize,
+    setPeriod: setPeriod,
+    getPeriod: getPeriod,
+    sun: function () { return SunSync; },
+    setPosts: setPosts,
+    getHeading: getHeading,
+    setHeading: setHeading,
+    draw: draw,
+    metrics: metrics,
+    plumeXs: function () { return lastPlumeXs.slice(); },
+    plumeLayout: function () {
+      return lastPlumeXs.map(function (x, i) { return { x: x, base: lastPlumeBases[i] }; });
+    },
+    setGroundInset: setGroundInset,
+    celestial: function () {
+      var c = CELESTIAL[period];
+      if (!c) return null;
+      var m = metrics();
+      var deg = c.deg;
+      var y = c.y;
+      var moon = (period === 'night') ? MoonSync.get() : null;
+      if (moon) {
+        if (!moon.up) return null;
+        deg = moon.azDeg;
+        y = Math.max(0.30, Math.min(0.66, 0.62 - (moon.altDeg / 60) * 0.44));
+      }
+      return { x: W / 2 + angleDelta(deg, heading) * m.ppd, y: H * y, r: Math.max(8, Math.round(H * c.r)) };
+    },
+    isStill: function () { return reduceMotion; },
+    setCelestialEnabled: function (v) { showCelestial = !!v; },
+    groundInsetValue: function () { return groundInset; },
+    groundInset: function () { return groundInset; },
+    setReduceMotion: function (v) { reduceMotion = !!v; }
+  };
+})();
+
+/* ==========================================================================
+ * E. プレビュー（焚き火の炎 + 立ち上る煙）
+ * ========================================================================== */
+
+var Preview = (function () {
+  'use strict';
+
+  var canvas = null;
+  var ctx = null;
+  var W = 1;
+  var H = 1;
+  var dpr = 1;
+  var img = null;
+  var hex = '#FF7A45';
+  var rgb = { r: 255, g: 122, b: 69 };
+  var period = 'night';
+  var reduceMotion = false;
+  var scratch = null;
+
+  function init(canvasEl, opts) {
+    canvas = canvasEl;
+    ctx = canvas.getContext('2d');
+    reduceMotion = !!(opts && opts.reduceMotion);
+    img = loadImage(ASSET_SRC.preview);
+    scratch = document.createElement('canvas');
+    scratch.width = 40;
+    scratch.height = 56;
+    resize();
+  }
+
+  function resize() {
+    if (!canvas) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    var rect = canvas.getBoundingClientRect();
+    W = Math.max(1, Math.round(rect.width));
+    H = Math.max(1, Math.round(rect.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+
+  function setColor(h, s, v) {
+    hex = rgbToHex(hsvToRgb({ h: h, s: s, v: v }));
+    rgb = hexToRgb(hex) || rgb;
+  }
+
+  function setHex(value) {
+    var n = parseHex(value);
+    if (n) {
+      hex = n;
+      rgb = hexToRgb(n) || rgb;
+    }
+  }
+
+  function setPeriod(p) { period = p; }
+
+  function geometry() {
+    var iw = (img && img.naturalWidth) || 896;
+    var ih = (img && img.naturalHeight) || 1200;
+    var s = Math.max(W / iw, H / ih);
+    var dw = iw * s;
+    var dh = ih * s;
+    var dx = (W - dw) / 2;
+    var dy = -(dh - H) * 0.9;
+    return { dx: dx, dy: dy, dw: dw, dh: dh };
+  }
+
+  function drawFire(t) {
+    var g = geometry();
+    // 石円(焚き火台座)は素材画像側に焼き込まれているため、焚き火の基点はキャンバス比率ではなく
+    // preview.webp(896x1200) 内の石円中心(画像比率 x=0.497, y=0.815 / 画像px 445,978)に固定する。
+    // 旧値 (0.475, 0.86) は石円の外=手前の石列の下に落ち、薪が円の外にはみ出して見える原因だった。
+    var fx = g.dx + g.dw * 0.497;
+    var fireY = g.dy + g.dh * 0.815;
+    // サイズも画像の描画スケールに連動させる。火加減=95(ユーザー確定値):
+    // 薪の先端が石の輪に掛かるが円の外には出ない範囲(内径rx≈80/外径rx≈125 画像px)。
+    var unit = Math.max(12, 95 * (g.dw / ((img && img.naturalWidth) || 896)));
+
+    // 焚き火の明かり
+    var glowR = unit * 1.7;
+    var glow = ctx.createRadialGradient(fx, fireY - unit * 0.3, 0, fx, fireY - unit * 0.3, glowR);
+    glow.addColorStop(0, rgbaOf(rgb, 0.4));
+    glow.addColorStop(0.55, rgbaOf(rgb, 0.14));
+    glow.addColorStop(1, rgbaOf(rgb, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(fx, fireY - unit * 0.3, glowR, 0, Math.PI * 2);
+    ctx.fill();
+
+    drawSmokeColumn(ctx, fx, fireY, unit, reduceMotion ? 1.7 : t, rgb);
+    drawCampfire(ctx, fx, fireY, unit, rgb, reduceMotion ? 1.7 : t, 0.9, reduceMotion);
+  }
+
+  function draw(t) {
+    if (!ctx) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    if (img && img.complete && img.naturalWidth) {
+      var g = geometry();
+      ctx.drawImage(img, g.dx, g.dy, g.dw, g.dh);
+    } else {
+      var bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, '#1b2140');
+      bg.addColorStop(1, '#0a0d18');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    // 時間帯の色味（同じ1枚を時間帯に寄せる）
+    var tint = {
+      morning: 'rgba(255,176,120,0.14)',
+      day: 'rgba(140,200,255,0.12)',
+      evening: 'rgba(255,120,90,0.14)',
+      night: 'rgba(20,26,60,0.18)'
+    }[period];
+    if (tint) {
+      ctx.fillStyle = tint;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    drawFire(reduceMotion ? 2.2 : (t || 0));
+
+    // 周囲を落として炎を際立たせる
+    var vig = ctx.createRadialGradient(W / 2, H * 0.62, Math.min(W, H) * 0.2, W / 2, H * 0.62, Math.max(W, H) * 0.78);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = vig;
+    ctx.fillRect(0, 0, W, H);
+  }
+
+  return {
+    init: init,
+    resize: resize,
+    draw: draw,
+    setColor: setColor,
+    setHex: setHex,
+    setPeriod: setPeriod,
+    setReduceMotion: function (v) { reduceMotion = !!v; }
+  };
+})();
+
+/* ==========================================================================
+ * F. 色の状態とピッカー（スライダー / SV / HEX / RGB）
+ * ========================================================================== */
+
+var color = {
+  h: 20,
+  s: 0.75,
+  v: 1,
+  hex: '#FF7A45',
+  rgb: { r: 255, g: 122, b: 69 },
+  valid: true
+};
+
+var svCanvas = null;
+var svCache = null;
+var svDragging = false;
+var svHueCached = -1;
+var currentTab = 'color';
+
+function renderSv(hue) {
+  var N = 72;
+  if (!svCache) {
+    svCache = document.createElement('canvas');
+    svCache.width = N;
+    svCache.height = N;
+  }
+  var g = svCache.getContext('2d');
+  var img = g.createImageData(N, N);
+  for (var y = 0; y < N; y++) {
+    var v = 1 - y / (N - 1);
+    for (var x = 0; x < N; x++) {
+      var s = x / (N - 1);
+      var c = hsvToRgb({ h: hue, s: s, v: v });
+      var i = (y * N + x) * 4;
+      img.data[i] = c.r;
+      img.data[i + 1] = c.g;
+      img.data[i + 2] = c.b;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  svHueCached = hue;
+}
+
+function drawSv() {
+  if (!svCanvas) return;
+  var dpr = Math.min(window.devicePixelRatio || 1, 3);
+  var rect = svCanvas.getBoundingClientRect();
+  var w = Math.max(1, Math.round(rect.width));
+  var h = Math.max(1, Math.round(rect.height));
+  if (svCanvas.width !== Math.round(w * dpr) || svCanvas.height !== Math.round(h * dpr)) {
+    svCanvas.width = Math.round(w * dpr);
+    svCanvas.height = Math.round(h * dpr);
+  }
+  if (svHueCached !== color.h) renderSv(color.h);
+
+  var ctx = svCanvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(svCache, 0, 0, w, h);
+
+  var mx = clampNum(color.s * w, 9, w - 9);
+  var my = clampNum((1 - color.v) * h, 9, h - 9);
+  ctx.beginPath();
+  ctx.arc(mx, my, 9, 0, Math.PI * 2);
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0,0,0,.45)';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(mx, my, 7, 0, Math.PI * 2);
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#fff';
+  ctx.stroke();
+}
+
+function syncControls(source) {
+  color.hex = rgbToHex(hsvToRgb({ h: color.h, s: color.s, v: color.v }));
+  color.rgb = hexToRgb(color.hex);
+
+  if (source !== 'hue') {
+    el.hue.value = String(Math.round(color.h));
+  }
+  if (source !== 'hex') {
+    el.hexInput.value = color.hex.slice(1);
+  }
+  if (source !== 'rgb') {
+    el.rgbR.value = String(color.rgb.r);
+    el.rgbG.value = String(color.rgb.g);
+    el.rgbB.value = String(color.rgb.b);
+  }
+  el.hexChip.style.background = color.hex;
+  el.pvHex.textContent = color.hex;
+  el.hexRow.setAttribute('data-invalid', 'false');
+  el.hexError.hidden = true;
+  el.hexInput.setAttribute('aria-invalid', 'false');
+  el.rgbR.parentNode.removeAttribute('data-invalid');
+  el.rgbG.parentNode.removeAttribute('data-invalid');
+  el.rgbB.parentNode.removeAttribute('data-invalid');
+
+  color.valid = true;
+  drawSv();
+  Preview.setHex(color.hex);
+  updateConfirm();
+}
+
+function setFromHex(hex, source) {
+  var norm = parseHex(hex);
+  if (!norm) return false;
+  var rgb = hexToRgb(norm);
+  var hsv = rgbToHsv(rgb);
+  if (hsv.s > 0.004 && hsv.v > 0.004) color.h = hsv.h;
+  color.s = hsv.s;
+  color.v = hsv.v;
+  color.hex = norm;
+  color.rgb = rgb;
+  syncControls(source || 'hex');
+  return true;
+}
+
+function updateConfirm() {
+  el.btnConfirm.disabled = !color.valid || state.posting;
+}
+
+function markInvalid(field) {
+  color.valid = false;
+  if (field === 'hex') {
+    el.hexRow.setAttribute('data-invalid', 'true');
+    el.hexInput.setAttribute('aria-invalid', 'true');
+    el.hexError.hidden = false;
+  }
+  if (field === 'r') el.rgbR.parentNode.setAttribute('data-invalid', 'true');
+  if (field === 'g') el.rgbG.parentNode.setAttribute('data-invalid', 'true');
+  if (field === 'b') el.rgbB.parentNode.setAttribute('data-invalid', 'true');
+  updateConfirm();
+}
+
+function readRgbInputs() {
+  var vals = [el.rgbR.value, el.rgbG.value, el.rgbB.value];
+  var out = [];
+  for (var i = 0; i < 3; i++) {
+    var raw = String(vals[i]).trim();
+    if (!/^[0-9]{1,3}$/.test(raw)) return null;
+    var n = Number(raw);
+    if (n < 0 || n > 255) return null;
+    out.push(n);
+  }
+  return out;
+}
+
+function applyRgbInput(sourceField) {
+  var v = readRgbInputs();
+  if (!v) {
+    markInvalid(sourceField);
+    return;
+  }
+  var hsv = rgbToHsv({ r: v[0], g: v[1], b: v[2] });
+  if (hsv.s > 0.004 && hsv.v > 0.004) color.h = hsv.h;
+  color.s = hsv.s;
+  color.v = hsv.v;
+  syncControls('rgb');
+}
+
+/* ==========================================================================
+ * G. 画面制御
+ * ========================================================================== */
+
+var state = {
+  screen: 'home',
+  rangeM: 5000,
+  posts: [],
+  truncated: false,
+  serverOffsetMs: 0,
+  position: null,
+  positionAt: 0,
+  deviceId: '',
+  ownIds: [],
+  history: [],
+  loading: false,
+  posting: false,
+  pendingDelete: null,
+  refreshTimer: null,
+  lastUpdatedAt: 0,
+  detail: null,
+  detailColor: '#FF7A45',
+  positionAccuracy: null,
+  tickTimer: null,
+  toastTimer: null,
+  rafId: 0,
+  lastFrame: 0,
+  reduceMotion: false
+};
+
+var el = {};
+
+function cacheEl() {
+  el.screenHome = elById('screen-home');
+  el.screenPicker = elById('screen-picker');
+  el.hero = elById('hero');
+  el.scene = elById('scene');
+  el.compass = elById('compass');
+  el.compassCanvas = elById('compass-canvas');
+  el.compassDeg = elById('compass-deg');
+  el.refresh = elById('btn-refresh');
+  el.rangeSelect = elById('range-select');
+  el.homeStatus = elById('home-status');
+  el.homeStatusText = elById('home-status-text');
+  el.retry = elById('btn-retry');
+  el.list = elById('post-list');
+  el.empty = elById('home-empty');
+  el.listNote = elById('list-note');
+  el.back = elById('btn-back');
+  el.preview = elById('preview');
+  el.pvHex = elById('pv-hex');
+  el.tabColor = elById('tab-color');
+  el.tabHistory = elById('tab-history');
+  el.panelColor = elById('panel-color');
+  el.panelHistory = elById('panel-history');
+  el.hue = elById('hue');
+  el.sv = elById('sv');
+  el.hexRow = elById('hex-row');
+  el.hexInput = elById('hex-input');
+  el.hexChip = elById('hex-chip');
+  el.hexError = elById('hex-error');
+  el.rgbR = elById('rgb-r');
+  el.rgbG = elById('rgb-g');
+  el.rgbB = elById('rgb-b');
+  el.historyList = elById('history-list');
+  el.historyEmpty = elById('history-empty');
+  el.clearHistory = elById('btn-clear-history');
+  el.listUpdated = elById('list-updated');
+  el.accuracyNote = elById('accuracy-note');
+  el.emptyTitle = elById('empty-title');
+  el.emptySub = elById('empty-sub');
+  el.emptyNote = elById('empty-note');
+  el.btnWiden = elById('btn-widen');
+  el.screenDetail = elById('screen-detail');
+  el.btnDetailBack = elById('btn-detail-back');
+  el.detailFire = elById('detail-fire');
+  el.dtTime = elById('dt-time');
+  el.dtPlace = elById('dt-place');
+  el.dtAddress = elById('dt-address');
+  el.dtCoordRow = elById('dt-coord-row');
+  el.dtCoord = elById('dt-coord');
+  el.dtMap = elById('dt-map');
+  el.dtNote = elById('dt-note');
+  el.dtError = elById('dt-error');
+  el.dtDelete = elById('dt-delete');
+  el.detailList = elById('detail-list');
+  el.pickerError = elById('picker-error');
+  el.btnCta = elById('btn-cta');
+  el.btnConfirm = elById('btn-confirm');
+  el.modal = elById('modal');
+  el.modalText = elById('modal-text');
+  el.modalOk = elById('modal-ok');
+  el.modalCancel = elById('modal-cancel');
+  el.overlay = elById('overlay');
+  el.overlayText = elById('overlay-text');
+  el.toast = elById('toast');
+  svCanvas = el.sv;
+}
+
+/* ---------------------------------------------------------------- 画面遷移 */
+
+function applyTimeOfDay() {
+  var now = new Date();
+  // 実際の日の出・日の入り（薄明）から時間帯を決める。判定不能なら従来の時刻ベースへ退避。
+  var p = debugPeriod() || Scene.sun().periodAt(now) || periodForHour(now.getHours());
+  Scene.setPeriod(p);
+  Preview.setPeriod(p);
+}
+
+function goHome() {
+  state.screen = 'home';
+  el.screenHome.hidden = false;
+  el.screenPicker.hidden = true;
+  el.screenDetail.hidden = true;
+  state.detail = null;
+  hidePickerError();
+  window.scrollTo(0, 0);
+  Scene.resize();
+  Scene.setPosts(state.posts);
+}
+
+function goPicker() {
+  state.screen = 'picker';
+  el.screenHome.hidden = true;
+  el.screenDetail.hidden = true;
+  el.screenPicker.hidden = false;
+  hidePickerError();
+  Preview.resize();
+  drawSv();
+  window.scrollTo(0, 0);
+  updateConfirm();
+}
+
+function switchTab(tab) {
+  currentTab = tab;
+  var isColor = tab === 'color';
+  el.tabColor.setAttribute('aria-selected', isColor ? 'true' : 'false');
+  el.tabHistory.setAttribute('aria-selected', isColor ? 'false' : 'true');
+  el.panelColor.hidden = !isColor;
+  el.panelHistory.hidden = isColor;
+  if (isColor) drawSv();
+  else renderHistory();
+}
+
+/* ---------------------------------------------------------------- 詳細 */
+
+var DetailFire = (function () {
+  'use strict';
+  var canvas = null;
+  var ctx = null;
+  var W = 1;
+  var H = 1;
+  var dpr = 1;
+  var rgb = { r: 255, g: 122, b: 69 };
+  var reduceMotion = false;
+
+  function init(canvasEl) {
+    canvas = canvasEl;
+    ctx = canvas.getContext('2d');
+  }
+
+  function resize() {
+    if (!canvas) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    var rect = canvas.getBoundingClientRect();
+    W = Math.max(1, Math.round(rect.width));
+    H = Math.max(1, Math.round(rect.height));
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+  }
+
+  function setColor(hex) {
+    rgb = hexToRgb(hex) || rgb;
+  }
+
+  function draw(t) {
+    if (!ctx) return;
+    if (W <= 1) resize();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var cx = W / 2;
+    var baseY = H * 0.78;
+    var unit = Math.max(18, Math.min(W, H) * 0.2);
+    var glow = ctx.createRadialGradient(cx, baseY - unit * 0.4, 0, cx, baseY - unit * 0.4, unit * 2.6);
+    glow.addColorStop(0, rgbaOf(rgb, 0.34));
+    glow.addColorStop(1, rgbaOf(rgb, 0));
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(cx, baseY - unit * 0.4, unit * 2.6, 0, Math.PI * 2);
+    ctx.fill();
+    drawCampfire(ctx, cx, baseY, unit, rgb, reduceMotion ? 1.7 : (t || 0), 0.6, reduceMotion);
+  }
+
+  return {
+    init: init,
+    resize: resize,
+    setColor: setColor,
+    setReduceMotion: function (v) { reduceMotion = !!v; },
+    draw: draw
+  };
+})();
+
+function formatClock(iso) {
+  var ms = Date.parse(iso);
+  if (!isFinite(ms)) return '—';
+  var d = new Date(ms);
+  return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+}
+
+function renderDetail(detail, color) {
+  state.detail = detail;
+  state.detailColor = color || '#FF7A45';
+  var expiredLike = !detail;
+  el.dtError.hidden = !expiredLike;
+  el.detailList.hidden = expiredLike;
+  el.dtMap.hidden = true;
+  el.dtDelete.hidden = true;
+  el.dtNote.hidden = true;
+  if (expiredLike) {
+    el.dtError.textContent = 'こののろしは見つかりませんでした。すでに消えている可能性があります。';
+    return;
+  }
+
+  el.dtTime.textContent = formatClock(detail.createdAt) + '・' + formatAge(detail.ageSec) ;
+  el.dtPlace.textContent = bearingPhrase(detail.distanceM, detail.bearingDeg);
+
+  if (detail.address) {
+    el.dtAddress.textContent = detail.address;
+    el.dtAddress.classList.remove('dt__dd--sub');
+  } else {
+    el.dtAddress.textContent = '住所を取得できませんでした';
+    el.dtAddress.classList.add('dt__dd--sub');
+  }
+
+  var hasCoord = detail.isMine && typeof detail.lat === 'number' && typeof detail.lng === 'number';
+  if (hasCoord) {
+    el.dtCoordRow.hidden = false;
+    el.dtCoord.textContent = detail.lat.toFixed(5) + ', ' + detail.lng.toFixed(5);
+    el.dtMap.href = 'https://www.google.com/maps?q=' + detail.lat + ',' + detail.lng;
+    el.dtMap.textContent = 'Googleマップで開く（この地点）';
+    el.dtMap.hidden = false;
+    el.dtDelete.hidden = false;
+  } else {
+    el.dtCoordRow.hidden = true;
+    el.dtCoord.textContent = '';
+    el.dtDelete.hidden = true;
+    // 他人の投稿は座標を持たない。住所（町名まで）で周辺を検索する
+    var area = mapQueryForAddress(detail.address);
+    if (area) {
+      el.dtMap.href = 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(area);
+      el.dtMap.textContent = 'Googleマップで開く（' + area + '）';
+      el.dtMap.hidden = false;
+    } else {
+      el.dtMap.hidden = true;
+      el.dtMap.removeAttribute('href');
+    }
+    el.dtNote.textContent = detail.address
+      ? 'ほかの人ののろしです。地図は町名の範囲で開きます。'
+      : '';
+    el.dtNote.hidden = !detail.address;
+  }
+  DetailFire.setColor(state.detailColor);
+  DetailFire.resize();
+}
+
+function openDetail(postId, color) {
+  state.screen = 'detail';
+  el.screenHome.hidden = true;
+  el.screenPicker.hidden = true;
+  el.screenDetail.hidden = false;
+  window.scrollTo(0, 0);
+  el.dtError.hidden = false;
+  el.dtError.textContent = '読み込んでいます...';
+  el.detailList.hidden = true;
+  DetailFire.setColor(color || '#FF7A45');
+  DetailFire.resize();
+  DetailFire.draw(1);
+
+  var pos = state.position || {};
+  NoroshiApi.getPostDetail({
+    postId: postId,
+    deviceId: state.deviceId,
+    lat: pos.lat,
+    lng: pos.lng
+  }).then(function (res) {
+    if (state.screen !== 'detail') return;
+    if (!res.ok || !res.detail) {
+      renderDetail(null, color);
+      return;
+    }
+    renderDetail(res.detail, color);
+  }).catch(function () {
+    if (state.screen === 'detail') renderDetail(null, color);
+  });
+}
+
+function closeDetail() {
+  state.screen = 'home';
+  el.screenDetail.hidden = true;
+  el.screenHome.hidden = false;
+  state.detail = null;
+  window.scrollTo(0, 0);
+  Scene.resize();
+  Scene.setPosts(state.posts);
+}
+
+/* ---------------------------------------------------------------- 方位 */
+
+/** 「のろしを上げる」ボタンに隠れる高さを景色に伝える（煙の根元をCTAの上に置く） */
+function loadStoredRange() {
+  try {
+    return parseStoredRange(window.localStorage.getItem(RANGE_STORAGE_KEY));
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveStoredRange(m) {
+  try {
+    window.localStorage.setItem(RANGE_STORAGE_KEY, String(m));
+  } catch (e) { /* 保存できない環境ではそのまま */ }
+}
+
+/** 保存された範囲を復元する（選択肢にない値は無視） */
+function restoreRange() {
+  var stored = loadStoredRange();
+  if (!stored) return;
+  state.rangeM = stored;
+  if (el.rangeSelect) el.rangeSelect.value = String(stored);
+}
+
+function updateSceneInset() {
+  if (!el.scene || !el.btnCta) return;
+  var hero = el.scene.getBoundingClientRect();
+  var cta = el.btnCta.getBoundingClientRect();
+  var inset = Math.max(0, hero.bottom - cta.top + 8);
+  Scene.setGroundInset(inset);
+}
+
+function updateCompassLabel() {
+  var deg = Math.round(wrapDeg(Scene.getHeading())) % 360;
+  el.compassDeg.textContent = bearingLabel(deg);
+  el.compass.setAttribute('aria-label', '方位 ' + cardinalEn(deg) + ' ' + deg + '度');
+}
+
+/* ---------------------------------------------------------------- 位置情報 */
+
+function geoErrorCode(err) {
+  if (!err) return 'unavailable';
+  if (err.code === 1) return 'denied';
+  if (err.code === 2) return 'unavailable';
+  if (err.code === 3) return 'timeout';
+  return 'unavailable';
+}
+
+function getPosition(opts) {
+  var o = opts || {};
+  return new Promise(function (resolve, reject) {
+    if (!navigator.geolocation) {
+      reject({ code: 'unsupported' });
+      return;
+    }
+    if (!o.force && state.position && Date.now() - state.positionAt < APP.positionFreshMs) {
+      resolve(state.position);
+      return;
+    }
+    var settled = false;
+    var guard = window.setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      reject({ code: 'timeout' });
+    }, 17000);
+
+    navigator.geolocation.getCurrentPosition(
+      function (pos) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(guard);
+        state.position = { lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy };
+        state.positionAccuracy = isFinite(pos.coords.accuracy) ? pos.coords.accuracy : null;
+        state.positionAt = Date.now();
+        resolve(state.position);
+      },
+      function (err) {
+        if (settled) return;
+        settled = true;
+        window.clearTimeout(guard);
+        reject({ code: geoErrorCode(err) });
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: o.maxAge || 0 }
+    );
+  });
+}
+
+/* ---------------------------------------------------------------- 一覧 */
+
+function showHomeStatus(text, retryKind) {
+  el.homeStatusText.textContent = text;
+  el.homeStatus.hidden = false;
+  el.retry.setAttribute('data-retry', retryKind || 'list');
+}
+
+function hideHomeStatus() {
+  el.homeStatus.hidden = true;
+}
+
+function normalizePost(p) {
+  var hex = parseHex(p && p.color);
+  if (!p || !p.id || !hex) return null;
+  var expires = Date.parse(p.expiresAt || '');
+  var created = Date.parse(p.createdAt || '');
+  if (!isFinite(expires)) expires = (isFinite(created) ? created : serverNow()) + APP.ttlMs;
+  return {
+    id: String(p.id),
+    color: hex,
+    createdAt: created,
+    expiresAt: expires,
+    ageSec: Number(p.ageSec) || 0,
+    distanceM: Number(p.distanceM) || 0,
+    bearingDeg: (p.bearingDeg === null || p.bearingDeg === undefined) ? null : Number(p.bearingDeg),
+    isMine: !!p.isMine
+  };
+}
+
+function loadList(opts) {
+  var o = opts || {};
+  if (state.loading) return Promise.resolve();
+  state.loading = true;
+  el.refresh.setAttribute('data-busy', 'true');
+
+  return getPosition({ force: !!o.forcePosition, maxAge: 30000 })
+    .catch(function (geo) {
+      showHomeStatus(GEO_MESSAGES[geo.code] || GEO_MESSAGES.unavailable, 'location');
+      return null;
+    })
+    .then(function (pos) {
+      if (!pos) return null;
+      hideHomeStatus();
+      return NoroshiApi.getNearbyPosts({
+        lat: pos.lat,
+        lng: pos.lng,
+        rangeM: state.rangeM,
+        deviceId: state.deviceId
+      });
+    })
+    .then(function (res) {
+      if (!res) return;
+      if (!res.ok) {
+        showHomeStatus(messageFor(res), 'list');
+        return;
+      }
+      var serverMs = Date.parse(res.serverTime || '');
+      if (isFinite(serverMs)) state.serverOffsetMs = serverMs - Date.now();
+      state.truncated = !!res.truncated;
+      var out = [];
+      var posts = res.posts || [];
+      for (var i = 0; i < posts.length; i++) {
+        var p = normalizePost(posts[i]);
+        if (p) out.push(p);
+      }
+      state.posts = out;
+      state.lastUpdatedAt = serverNow();
+      updateUpdatedLabel();
+      updateAccuracyNote();
+      renderList();
+    })
+    .catch(function () {
+      showHomeStatus(CLIENT_MESSAGES.E_LIST_NETWORK, 'list');
+    })
+    .then(function () {
+      state.loading = false;
+      el.refresh.setAttribute('data-busy', 'false');
+    });
+}
+
+var FLAME_PATH = 'M13.5.67s.74 2.65.74 4.8c0 2.06-1.35 3.73-3.41 3.73-2.03 0-3.85-1.67-3.85-3.73 0-4.13 2.76-7.47 2.76-7.47C4.77 1.44 2 5.63 2 9.94c0 4.82 3.85 8.73 8.63 8.73 4.78 0 8.63-3.91 8.63-8.73 0-3.82-2.18-7.26-5.76-9.27z';
+var FLAME_CORE_PATH = 'M12 12.9l-2.03 2.71c-.31.41-.47.88-.47 1.39 0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5c0-.51-.16-.98-.47-1.39L12 12.9z';
+
+function createFlameSvg(color) {
+  var ns = 'http://www.w3.org/2000/svg';
+  var svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('class', 'post__flame');
+  svg.setAttribute('aria-hidden', 'true');
+  var rgb = hexToRgb(color) || { r: 255, g: 122, b: 69 };
+  var path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', FLAME_PATH);
+  path.setAttribute('fill', color);
+  if (shouldOutline(rgb, hexToRgb('#111726'), 1.5)) {
+    path.setAttribute('stroke', 'rgba(238,242,255,.85)');
+    path.setAttribute('stroke-width', '1.2');
+  }
+  svg.appendChild(path);
+  var core = document.createElementNS(ns, 'path');
+  core.setAttribute('d', FLAME_CORE_PATH);
+  core.setAttribute('fill', rgbToHex(mixRgb(rgb, { r: 255, g: 255, b: 255 }, 0.62)));
+  svg.appendChild(core);
+  return svg;
+}
+
+function isMine(post) {
+  return post.isMine || state.ownIds.indexOf(post.id) !== -1;
+}
+
+function updateAccuracyNote() {
+  if (!el.accuracyNote) return;
+  var note = accuracyNote(state.positionAccuracy);
+  el.accuracyNote.textContent = note;
+  el.accuracyNote.hidden = !note;
+}
+
+function updateUpdatedLabel() {
+  if (!el.listUpdated) return;
+  if (!state.lastUpdatedAt) { el.listUpdated.textContent = '未取得'; return; }
+  var d = new Date(state.lastUpdatedAt);
+  var hh = ('0' + d.getHours()).slice(-2);
+  var mm = ('0' + d.getMinutes()).slice(-2);
+  el.listUpdated.textContent = hh + ':' + mm + ' 更新・' + rangeLabelM(state.rangeM);
+}
+
+/** 0件のときの案内（範囲・精度・次に広げるボタン） */
+function renderEmptyState(count) {
+  el.empty.hidden = count > 0;
+  if (count > 0) return;
+  el.emptyTitle.textContent = emptyTitleFor(state.rangeM);
+  el.emptySub.textContent = 'のろしを上げるか、範囲を広げてみてください。';
+  var note = accuracyNote(state.positionAccuracy);
+  el.emptyNote.textContent = note ? note + ' 範囲を広げても出ない場合は、位置情報を確認してください。' : '';
+  el.emptyNote.hidden = !note;
+  var next = widenTargetFor(state.rangeM);
+  if (next) {
+    el.btnWiden.textContent = rangeLabelM(next) + 'に広げる';
+    el.btnWiden.hidden = false;
+  } else {
+    el.widenTo = null;
+    el.btnWiden.hidden = true;
+  }
+  el.widenTo = next;
+}
+
+function renderList() {
+  var now = serverNow();
+  var rows = [];
+  for (var i = 0; i < state.posts.length; i++) {
+    if (!isPostExpired(state.posts[i].expiresAt, now)) rows.push(state.posts[i]);
+  }
+  state.posts = rows;
+
+  el.list.textContent = '';
+  for (var j = 0; j < rows.length; j++) el.list.appendChild(buildRow(rows[j]));
+
+  renderEmptyState(rows.length);
+
+  if (state.truncated) {
+    el.listNote.hidden = false;
+    el.listNote.textContent = '近い順に100件まで表示しています。範囲を狭めると見やすくなります。';
+  } else {
+    el.listNote.hidden = true;
+  }
+
+  Scene.setPosts(rows);
+}
+
+function buildRow(post) {
+  var li = document.createElement('li');
+  li.className = 'post' + (isMine(post) ? ' post--mine' : '');
+  li.setAttribute('data-id', post.id);
+  li.setAttribute('data-color', post.color || '#FF7A45');
+  li.setAttribute('data-expires', String(post.expiresAt));
+  li.setAttribute('data-created', String(post.createdAt));
+
+  li.appendChild(createFlameSvg(post.color));
+
+  var body = document.createElement('div');
+  body.className = 'post__body';
+
+  var age = document.createElement('span');
+  age.className = 'post__age';
+  age.textContent = formatAge(Math.floor((serverNow() - post.createdAt) / 1000));
+  body.appendChild(age);
+
+  var sub = document.createElement('span');
+  sub.className = 'post__sub';
+  var dist = document.createElement('span');
+  dist.className = 'post__dist';
+  dist.textContent = bearingPhrase(post.distanceM, post.bearingDeg);
+  sub.appendChild(dist);
+
+  if (isMine(post)) {
+    var chip = document.createElement('span');
+    chip.className = 'mine';
+    chip.textContent = '自分';
+    sub.appendChild(chip);
+  }
+  body.appendChild(sub);
+  li.appendChild(body);
+
+  if (isMine(post)) {
+    var del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'post__del';
+    del.setAttribute('data-delete', post.id);
+    del.textContent = '消す';
+    li.appendChild(del);
+  }
+  return li;
+}
+
+function tickAges() {
+  if (state.screen !== 'home') return;
+  var now = serverNow();
+  var items = el.list.querySelectorAll('.post');
+  for (var i = items.length - 1; i >= 0; i--) {
+    var li = items[i];
+    var expires = Number(li.getAttribute('data-expires'));
+    var created = Number(li.getAttribute('data-created'));
+    if (isPostExpired(expires, now)) {
+      li.parentNode.removeChild(li);
+      continue;
+    }
+    var ageEl = li.querySelector('.post__age');
+    if (ageEl && isFinite(created)) ageEl.textContent = formatAge(Math.floor((now - created) / 1000));
+  }
+  if (!el.list.children.length) el.empty.hidden = false;
+  state.posts = state.posts.filter(function (p) { return !isPostExpired(p.expiresAt, now); });
+  Scene.setPosts(state.posts);
+}
+
+/* ---------------------------------------------------------------- 削除 */
+
+function askDelete(postId) {
+  state.pendingDelete = postId;
+  el.modalText.textContent = '消すと元に戻せません。\n（時間が経てば自動でも消えます）';
+  el.modal.hidden = false;
+  el.modalCancel.focus();
+}
+
+function closeModal() {
+  el.modal.hidden = true;
+  state.pendingDelete = null;
+}
+
+function doDelete() {
+  var postId = state.pendingDelete;
+  closeModal();
+  if (!postId) return;
+
+  showOverlay('消しています…');
+  Store.getOwnPost(postId).then(function (rec) {
+    if (!rec || !rec.secretKey) {
+      hideOverlay();
+      showToast('この端末に削除キーがありません。時間が経てば自動で消えます。');
+      return null;
+    }
+    return NoroshiApi.deletePost({ postId: postId, secretKey: rec.secretKey }).then(function (res) {
+      hideOverlay();
+      if (res.ok) {
+        state.posts = state.posts.filter(function (p) { return p.id !== postId; });
+        state.ownIds = state.ownIds.filter(function (id) { return id !== postId; });
+        var wasDetail = state.screen === 'detail';
+        renderList();
+        if (wasDetail) closeDetail();
+        Store.removeOwnPost(postId);
+        showToast('消しました');
+        return;
+      }
+      showToast(messageFor(res));
+      return loadList({});
+    });
+  }).catch(function () {
+    hideOverlay();
+    showToast(CLIENT_MESSAGES.E_NETWORK);
+  });
+}
+
+/* ---------------------------------------------------------------- 投稿 */
+
+function randomBytes(n) {
+  var out = new Uint8Array(n);
+  if (!window.crypto || !window.crypto.getRandomValues) return null;
+  window.crypto.getRandomValues(out);
+  return out;
+}
+
+function showPickerError(text) {
+  el.pickerError.textContent = text;
+  el.pickerError.hidden = false;
+}
+
+function hidePickerError() {
+  el.pickerError.hidden = true;
+  el.pickerError.textContent = '';
+}
+
+function startPost() {
+  if (state.posting) return;
+  if (!color.valid) {
+    showPickerError('入力内容が正しくありません。HEX か RGB を確認してください。');
+    return;
+  }
+  var hex = parseHex(color.hex);
+  if (!hex) {
+    showPickerError('HEXの値が正しくありません。6桁の16進数で入力してください。');
+    return;
+  }
+  var idBytes = randomBytes(16);
+  var keyBytes = randomBytes(32);
+  if (!idBytes || !keyBytes) {
+    showPickerError('このブラウザでは安全な乱数を使えないため投稿できません。別のブラウザでお試しください。');
+    return;
+  }
+
+  state.posting = true;
+  updateConfirm();
+  hidePickerError();
+  showOverlay('現在地を取得しています…');
+
+  // 履歴は「この色でのろしを上げる」を押した時点で記録する
+  addHistory(hex);
+
+  getPosition({ force: true, maxAge: 0 })
+    .catch(function (geo) {
+      hideOverlay();
+      state.posting = false;
+      updateConfirm();
+      showPickerError((GEO_MESSAGES[geo.code] || GEO_MESSAGES.unavailable) + APP.postRetryHint);
+      return null;
+    })
+    .then(function (pos) {
+      if (!pos) return null;
+      showOverlay('のろしを上げています…');
+      var postId = bytesToHex(idBytes);
+      var secretKey = bytesToHex(keyBytes);
+      return NoroshiApi.createPost({
+        postId: postId,
+        secretKey: secretKey,
+        color: hex,
+        lat: pos.lat,
+        lng: pos.lng,
+        deviceId: state.deviceId
+      }).then(function (res) {
+        hideOverlay();
+        state.posting = false;
+        if (!res.ok) {
+          updateConfirm();
+          showPickerError(messageFor(res));
+          return null;
+        }
+        var post = res.post || {};
+        var createdAt = post.createdAt || new Date().toISOString();
+        return Store.saveOwnPost({
+          postId: postId,
+          secretKey: secretKey,
+          createdAt: createdAt,
+          color: hex
+        }).then(function () {
+          state.ownIds.push(postId);
+          goHome();
+          showToast('のろしを上げました');
+          loadList({ forcePosition: false });
+        });
+      });
+    })
+    .catch(function () {
+      hideOverlay();
+      state.posting = false;
+      updateConfirm();
+      showPickerError(CLIENT_MESSAGES.E_NETWORK);
+    });
+}
+
+/* ---------------------------------------------------------------- 色履歴 */
+
+function renderHistory() {
+  var list = state.history || [];
+  el.historyList.textContent = '';
+  el.clearHistory.disabled = !list.length;
+  if (!list.length) {
+    el.historyEmpty.hidden = false;
+    return;
+  }
+  el.historyEmpty.hidden = true;
+  for (var i = 0; i < list.length; i++) {
+    var hex = list[i];
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'swatch';
+    b.style.background = hex;
+    b.setAttribute('data-hex', hex);
+    b.setAttribute('aria-label', 'いろ ' + hex);
+    b.setAttribute('aria-pressed', hex === color.hex ? 'true' : 'false');
+
+    var x = document.createElement('span');
+    x.className = 'swatch__x';
+    x.setAttribute('data-del', hex);
+    x.setAttribute('role', 'button');
+    x.setAttribute('aria-label', hex + ' を履歴から消す');
+    x.textContent = '×';
+    b.appendChild(x);
+
+    el.historyList.appendChild(b);
+  }
+}
+
+function addHistory(hex) {
+  return Store.addColor(hex).then(function (list) {
+    state.history = list || [];
+    renderHistory();
+  }).catch(function () {});
+}
+
+/* ---------------------------------------------------------------- 小物 */
+
+function showOverlay(text) {
+  el.overlayText.textContent = text;
+  el.overlay.hidden = false;
+}
+
+function hideOverlay() {
+  el.overlay.hidden = true;
+}
+
+function showToast(text) {
+  el.toast.textContent = text;
+  el.toast.hidden = false;
+  if (state.toastTimer) window.clearTimeout(state.toastTimer);
+  state.toastTimer = window.setTimeout(function () { el.toast.hidden = true; }, 3200);
+}
+
+/* ---------------------------------------------------------------- 描画ループ */
+
+function frame(ts) {
+  state.rafId = window.requestAnimationFrame(frame);
+  if (document.hidden) return;
+  var t = ts / 1000;
+  if (state.screen === 'home') {
+    Scene.draw(t);
+  } else if (state.screen === 'detail') {
+    if (state.lastFrame && ts - state.lastFrame < 1000 / 30) return;
+    DetailFire.draw(t);
+  } else {
+    if (state.lastFrame && ts - state.lastFrame < 1000 / 30) return;
+    Preview.draw(t);
+  }
+  state.lastFrame = ts;
+}
+
+function startLoop() {
+  if (state.rafId) return;
+  state.rafId = window.requestAnimationFrame(frame);
+}
+
+function stopLoop() {
+  if (state.rafId) {
+    window.cancelAnimationFrame(state.rafId);
+    state.rafId = 0;
+  }
+}
+
+function stopTimers() {
+  if (state.refreshTimer) {
+    window.clearInterval(state.refreshTimer);
+    state.refreshTimer = null;
+  }
+  if (state.tickTimer) {
+    window.clearInterval(state.tickTimer);
+    state.tickTimer = null;
+  }
+}
+
+function startTimers() {
+  stopTimers();
+  state.refreshTimer = window.setInterval(function () {
+    if (document.hidden) return;
+    if (state.screen !== 'home') return;
+    applyTimeOfDay();
+    loadList({});
+  }, APP.refreshMs);
+  // 経過時間の更新と、表示中の期限切れ除去
+  state.tickTimer = window.setInterval(function () {
+    if (document.hidden) return;
+    tickAges();
+  }, APP.tickMs);
+}
+
+/* ---------------------------------------------------------------- 入力 */
+
+function initDrag() {
+  var dragging = false;
+  var startX = 0;
+  var startHeading = 0;
+  var moved = 0;
+  var lastX = 0;
+  var vel = 0;
+
+  function degPerPx() {
+    var m = Scene.metrics();
+    return 1 / m.ppd; // px あたりの度数（ppd = 1度あたりの px）
+  }
+
+  function down(ev) {
+    dragging = true;
+    moved = 0;
+    startX = ev.clientX;
+    lastX = ev.clientX;
+    startHeading = Scene.getHeading();
+    vel = 0;
+    try { el.scene.setPointerCapture(ev.pointerId); } catch (e) {}
+  }
+
+  function move(ev) {
+    if (!dragging) return;
+    var dx = ev.clientX - startX;
+    moved = Math.max(moved, Math.abs(dx));
+    vel = ev.clientX - lastX;
+    lastX = ev.clientX;
+    Scene.setHeading(startHeading - dx * degPerPx());
+    updateCompassLabel();
+  }
+
+  function up(ev) {
+    if (!dragging) return;
+    dragging = false;
+    try { el.scene.releasePointerCapture(ev.pointerId); } catch (e) {}
+    // 慣性（小さく）
+    if (Math.abs(vel) > 2 && !state.reduceMotion) {
+      var step = vel * 6;
+      Scene.setHeading(Scene.getHeading() - step * degPerPx() * 0.5);
+      updateCompassLabel();
+    }
+  }
+
+  el.scene.addEventListener('pointerdown', down);
+  el.scene.addEventListener('pointermove', move);
+  el.scene.addEventListener('pointerup', up);
+  el.scene.addEventListener('pointercancel', up);
+
+  document.addEventListener('keydown', function (ev) {
+    if (state.screen !== 'home') return;
+    if (ev.key === 'ArrowLeft') {
+      Scene.setHeading(Scene.getHeading() - 15);
+      updateCompassLabel();
+    } else if (ev.key === 'ArrowRight') {
+      Scene.setHeading(Scene.getHeading() + 15);
+      updateCompassLabel();
+    }
+  });
+}
+
+function initSv() {
+  function point(ev) {
+    var rect = el.sv.getBoundingClientRect();
+    return {
+      x: clampNum((ev.clientX - rect.left) / (rect.width || 1), 0, 1),
+      y: clampNum((ev.clientY - rect.top) / (rect.height || 1), 0, 1)
+    };
+  }
+  function apply(ev) {
+    var p = point(ev);
+    color.s = p.x;
+    color.v = 1 - p.y;
+    syncControls('sv');
+  }
+  el.sv.addEventListener('pointerdown', function (ev) {
+    svDragging = true;
+    ev.preventDefault();
+    try { el.sv.setPointerCapture(ev.pointerId); } catch (e) {}
+    apply(ev);
+  });
+  el.sv.addEventListener('pointermove', function (ev) {
+    if (!svDragging) return;
+    ev.preventDefault();
+    apply(ev);
+  });
+  el.sv.addEventListener('pointerup', function (ev) {
+    svDragging = false;
+    try { el.sv.releasePointerCapture(ev.pointerId); } catch (e) {}
+  });
+  el.sv.addEventListener('pointercancel', function () { svDragging = false; });
+}
+
+function bindEvents() {
+  el.btnCta.addEventListener('click', goPicker);
+  el.back.addEventListener('click', goHome);
+  el.btnConfirm.addEventListener('click', startPost);
+
+  el.tabColor.addEventListener('click', function () { switchTab('color'); });
+  el.tabHistory.addEventListener('click', function () { switchTab('history'); });
+
+  el.hue.addEventListener('input', function () {
+    color.h = Number(el.hue.value);
+    syncControls('hue');
+  });
+
+  el.hexInput.addEventListener('input', function (ev) {
+    var raw = String(ev.target.value || '');
+    if (raw.charAt(0) === '#') {
+      raw = raw.slice(1);
+      ev.target.value = raw;
+    }
+    if (/^[0-9a-fA-F]{6}$/.test(raw)) {
+      setFromHex(raw, 'hex');
+      return;
+    }
+    color.valid = false;
+    markInvalid('hex');
+  });
+  el.hexInput.addEventListener('blur', function () {
+    if (!/^[0-9a-fA-F]{6}$/.test(String(el.hexInput.value || ''))) markInvalid('hex');
+  });
+
+  [['r', el.rgbR], ['g', el.rgbG], ['b', el.rgbB]].forEach(function (pair) {
+    pair[1].addEventListener('input', function () { applyRgbInput(pair[0]); });
+    pair[1].addEventListener('blur', function () { applyRgbInput(pair[0]); });
+  });
+
+  el.historyList.addEventListener('click', function (ev) {
+    var del = ev.target && ev.target.closest ? ev.target.closest('[data-del]') : null;
+    if (del) {
+      ev.stopPropagation();
+      var hex = del.getAttribute('data-del');
+      Store.removeColor(hex).then(function (list) {
+        state.history = list || [];
+        renderHistory();
+      });
+      return;
+    }
+    var sw = ev.target && ev.target.closest ? ev.target.closest('[data-hex]') : null;
+    if (sw) {
+      setFromHex(sw.getAttribute('data-hex'), 'hex');
+      switchTab('color');
+    }
+  });
+
+  el.clearHistory.addEventListener('click', function () {
+    if (!state.history.length) return;
+    Store.clearColors().then(function () {
+      state.history = [];
+      renderHistory();
+      showToast('履歴を消しました');
+    });
+  });
+
+  el.rangeSelect.addEventListener('change', function () {
+    state.rangeM = Number(el.rangeSelect.value) || 5000;
+    saveStoredRange(state.rangeM);
+    updateUpdatedLabel();
+    loadList({});
+  });
+
+  el.refresh.addEventListener('click', function () {
+    if (state.loading) return;
+    loadList({ forcePosition: true });
+  });
+
+  // 0件のときの「20kmに広げる」
+  el.btnWiden.addEventListener('click', function () {
+    var next = widenTargetFor(state.rangeM);
+    if (!next) return;
+    state.rangeM = next;
+    el.rangeSelect.value = String(next);
+    saveStoredRange(next);
+    updateUpdatedLabel();
+    loadList({});
+  });
+
+  // アプリに戻ってきたら取り直す（バックグラウンド中はタイマーが止まるため）
+  function refreshIfStale() {
+    if (state.screen !== 'home') return;
+    if (state.loading) return;
+    if (state.lastUpdatedAt && Date.now() - state.lastUpdatedAt < 15000) return;
+    loadList({});
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshIfStale();
+  });
+  window.addEventListener('pageshow', function (ev) {
+    if (ev && ev.persisted) refreshIfStale();
+  });
+  window.addEventListener('focus', refreshIfStale);
+
+  el.retry.addEventListener('click', function () {
+    var kind = el.retry.getAttribute('data-retry');
+    loadList({ forcePosition: kind === 'location' });
+  });
+
+  el.list.addEventListener('click', function (ev) {
+    var del = ev.target && ev.target.closest ? ev.target.closest('[data-delete]') : null;
+    if (del) {
+      askDelete(del.getAttribute('data-delete'));
+      return;
+    }
+    var row = ev.target && ev.target.closest ? ev.target.closest('.post') : null;
+    if (!row) return;
+    var id = row.getAttribute('data-id');
+    if (!id) return;
+    var color = row.getAttribute('data-color') || '#FF7A45';
+    openDetail(id, color);
+  });
+
+  el.btnDetailBack.addEventListener('click', closeDetail);
+
+  el.dtDelete.addEventListener('click', function () {
+    if (state.detail && state.detail.id) askDelete(state.detail.id);
+  });
+
+  el.modalCancel.addEventListener('click', closeModal);
+  el.modalOk.addEventListener('click', doDelete);
+  el.modal.addEventListener('click', function (ev) {
+    if (ev.target === el.modal) closeModal();
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && !el.modal.hidden) closeModal();
+  });
+
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden) {
+      stopTimers();
+      stopLoop();
+      return;
+    }
+    applyTimeOfDay();
+    startLoop();
+    startTimers();
+    if (state.screen === 'home') loadList({});
+    else Preview.resize();
+  });
+
+  var onResize = function () {
+    Scene.resize();
+    updateSceneInset();
+    if (state.screen === 'picker') {
+      Preview.resize();
+      drawSv();
+    }
+  };
+  window.addEventListener('resize', onResize);
+  window.addEventListener('orientationchange', function () { setTimeout(onResize, 120); });
+
+  window.addEventListener('online', function () {
+    if (state.screen === 'home') loadList({});
+  });
+
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var apply = function () {
+      state.reduceMotion = !!mq.matches;
+      Scene.setReduceMotion(state.reduceMotion);
+      Preview.setReduceMotion(state.reduceMotion);
+      DetailFire.setReduceMotion(state.reduceMotion);
+    };
+    apply();
+    if (mq.addEventListener) mq.addEventListener('change', apply);
+    else if (mq.addListener) mq.addListener(apply);
+  }
+}
+
+/* ---------------------------------------------------------------- 初期化 */
+
+function init() {
+  cacheEl();
+
+  restoreRange();
+  Scene.init(el.scene, el.compassCanvas, { reduceMotion: state.reduceMotion });
+  updateSceneInset();
+  Preview.init(el.preview, { reduceMotion: state.reduceMotion });
+  DetailFire.init(el.detailFire);
+  applyTimeOfDay();
+
+  initDrag();
+  initSv();
+  bindEvents();
+
+  goHome();
+  switchTab('color');
+  setFromHex('#FF7A45', 'hex');
+  renderHistory();
+
+  Scene.draw(0);
+  Preview.draw(2.2);
+  startLoop();
+  startTimers();
+  updateCompassLabel();
+
+  var boot = [
+    Store.initDeviceId().then(function (id) { state.deviceId = id || ''; }),
+    Store.pruneOwnPosts(APP.ttlMs),
+    Store.listOwnPostIds().then(function (ids) { state.ownIds = ids || []; }),
+    Store.listColors().then(function (colors) {
+      state.history = colors || [];
+      renderHistory();
+    })
+  ];
+
+  Promise.all(boot.slice(0, 3))
+    .then(function () { loadList({ forcePosition: false }); })
+    .catch(function () { loadList({ forcePosition: false }); });
+}
+
+init();
+</script>
+</body>
+</html>
