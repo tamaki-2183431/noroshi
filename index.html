@@ -867,9 +867,64 @@ input, select { font: inherit; }
   .rgb { padding: 0 8px; gap: 4px; }
   .rgb input { font-size: 14px; }
 }
+/* ===== 起動スプラッシュ（design_handoff_noroshi_splash） ===== */
+html.ns-lock, body.ns-lock { overflow: hidden; overscroll-behavior: none; }
+#ns-splash {
+  position: fixed; inset: 0; z-index: 9999; background: #080b14;
+  overflow: hidden; opacity: 1; pointer-events: auto;
+  font-family: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Hiragino Sans", sans-serif;
+}
+#ns-frame {
+  position: absolute; left: 50%; top: 50%; width: 1080px; height: 1920px;
+  transform-origin: center center; will-change: transform;
+}
+#ns-canvas { position: absolute; inset: 0; width: 1080px; height: 1920px; image-rendering: pixelated; }
+#ns-shade {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 760px; opacity: 0;
+  background: linear-gradient(to top, rgba(6,9,18,.82) 0%, rgba(6,9,18,.5) 40%, rgba(6,9,18,0) 100%);
+}
+#ns-title { position: absolute; left: 0; right: 0; top: 1500px; display: flex; flex-direction: column; align-items: center; transform-origin: 50% 100%; will-change: transform; }
+#ns-logo { display: flex; align-items: center; gap: 30px; }
+#ns-mark { opacity: 0; filter: drop-shadow(0 0 28px rgba(255,150,60,.55)); will-change: transform, opacity; }
+#ns-chars { display: flex; white-space: nowrap; }
+#ns-chars span {
+  display: inline-block; font-weight: 800; font-size: 172px; line-height: 1;
+  letter-spacing: .1em; color: #fff; opacity: 0;
+  text-shadow: 0 4px 30px rgba(0,0,0,.6); will-change: transform, filter, opacity;
+}
+#ns-tag {
+  margin-top: 64px; font-weight: 500; font-size: 38px; letter-spacing: .12em;
+  color: rgba(238,242,255,.86); text-shadow: 0 2px 14px rgba(0,0,0,.7); opacity: 0;
+  white-space: nowrap;
+}
+#ns-fade { position: absolute; inset: 0; background: #080b14; pointer-events: none; opacity: 1; }
 </style>
 </head>
 <body>
+
+<!-- ===== 起動スプラッシュ（design_handoff_noroshi_splash） ===== -->
+<div id="ns-splash" role="img" aria-label="のろし 起動画面">
+  <div id="ns-frame">
+    <canvas id="ns-canvas" width="1080" height="1920"></canvas>
+    <div id="ns-shade"></div>
+    <div id="ns-title">
+      <div id="ns-logo">
+        <div id="ns-mark">
+          <svg width="136" height="136" viewBox="0 0 24 24" aria-hidden="true" style="overflow:visible;display:block">
+            <path d="M5 19.6l14.2-2.5M5.2 17.1l13.8 2.6" stroke="#c98a5a" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+            <g id="ns-flame" style="transform-origin:12px 17px">
+              <path d="M12 2.2c1.9 1.9 2.9 3.3 2.9 4.9 0 1.1-.6 2-1.5 2.5.9.6 1.5 1.7 1.5 3 0 2.4-1.8 4.2-4.1 4.2-2.4 0-4.2-1.8-4.2-4.4 0-2.7 1.6-4.6 3.4-6.1-.2 1.3.2 2.3 1 2.8C10 6.6 10.6 4.5 12 2.2z" fill="#ffae4a"/>
+              <path d="M10.7 11.1c1.2 1.2 1.9 2.1 1.9 3.2 0 1.3-.9 2.2-1.9 2.2s-1.9-.9-1.9-2.2c0-1.1.7-2 1.9-3.2z" fill="#fff0cf"/>
+            </g>
+          </svg>
+        </div>
+        <div id="ns-chars"><span>の</span><span>ろ</span><span>し</span></div>
+      </div>
+      <div id="ns-tag">近くにいる誰かに、今ここにいることを知らせる。</div>
+    </div>
+    <div id="ns-fade"></div>
+  </div>
+</div>
 
 <div class="app" id="app">
 
@@ -4010,12 +4065,412 @@ function init() {
     })
   ];
 
-  Promise.all(boot.slice(0, 3))
-    .then(function () { loadList({ forcePosition: false }); })
-    .catch(function () { loadList({ forcePosition: false }); });
+  var afterBoot = function () {
+    var p = loadList({ forcePosition: false });
+    var ready = function () { if (window.NS_Splash) window.NS_Splash.markAppReady(); };
+    if (p && p.then) p.then(ready, ready);
+    else setTimeout(ready, 1500);
+  };
+  Promise.all(boot.slice(0, 3)).then(afterBoot).catch(afterBoot);
 }
 
 init();
+</script>
+<script>
+/* 起動スプラッシュ — design_handoff_noroshi_splash の splash-scene.jsx を Vanilla JS へ移植
+ * React 非依存 / requestAnimationFrame + Canvas2D。既存の drawCampfire / drawSmokeColumn は変更しない。 */
+(function () {
+  'use strict';
+
+  var QS = new URLSearchParams(location.search);
+  if (QS.get('splash') === '0') return;            // E2E / デバッグ用フック
+  var FIX_T = QS.get('splash_t');                  // ?splash_t=4.8 でその時刻に静止（検証用）
+  var root = document.getElementById('ns-splash');
+  if (!root) return;
+
+  /* ---------------- 定数 ---------------- */
+  var W = 1080, H = 1920;
+  var WORLD_W = 2880, WORLD_H = 1920;
+  var PX = 3, BX0 = 560, BUF_W = 600;
+  var FIRE_X = 1440, FIRE_Y = 1262;
+  var ACCENT = '#ff9a3c';
+  var STORE_KEY = 'noroshi.splashDate';
+
+  /* ---------------- 数学 ---------------- */
+  function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+  function lerp(a, b, k) { return a + (b - a) * k; }
+  var E = {
+    outCubic: function (p) { return 1 - Math.pow(1 - p, 3); },
+    inCubic: function (p) { return p * p * p; },
+    inOutSine: function (p) { return -(Math.cos(Math.PI * p) - 1) / 2; },
+    outBack: function (p) { var c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); }
+  };
+  function seg(t, a, b, ease) {
+    var p = clamp((t - a) / (b - a), 0, 1);
+    return ease ? ease(p) : p;
+  }
+  function multi(t, ts, vs) {
+    if (t <= ts[0]) return vs[0];
+    for (var i = 1; i < ts.length; i++) {
+      if (t <= ts[i]) {
+        var k = (t - ts[i - 1]) / (ts[i] - ts[i - 1]);
+        return lerp(vs[i - 1], vs[i], k);
+      }
+    }
+    return vs[vs.length - 1];
+  }
+  function mix(a, b, k) { return { r: lerp(a.r, b.r, k), g: lerp(a.g, b.g, k), b: lerp(a.b, b.b, k) }; }
+  function rgba(c, a) { return 'rgba(' + Math.round(c.r) + ',' + Math.round(c.g) + ',' + Math.round(c.b) + ',' + clamp(a, 0, 1).toFixed(3) + ')'; }
+  function hex(h) { var n = parseInt(h.replace('#', ''), 16); return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 }; }
+  function flicker(t, seed) { return 1 + 0.13 * Math.sin(t * 7.1 + seed) + 0.07 * Math.sin(t * 13.7 + seed * 2.3); }
+
+  var STARS = (function () {
+    var s = 7, out = [], i;
+    function rnd() { s = (s * 16807) % 2147483647; return s / 2147483647; }
+    for (i = 0; i < 70; i++) out.push({ x: 820 + rnd() * 1260, y: 60 + rnd() * 760, p: rnd() * 6.28, sp: 1.2 + rnd() * 2.4, big: rnd() > 0.82 });
+    return out;
+  })();
+
+  var OTHERS = [
+    { x: 1012, y: 1258, color: '#62d8c6', start: 2.75, top: 640, unit: 13, seed: 1.3 },
+    { x: 1838, y: 1260, color: '#ff7aa8', start: 3.05, top: 560, unit: 15, seed: 2.9 },
+    { x: 1180, y: 1262, color: '#a99bff', start: 3.35, top: 760, unit: 11, seed: 4.1 },
+    { x: 1966, y: 1259, color: '#c4ee6a', start: 3.6, top: 800, unit: 10, seed: 5.7 }
+  ];
+
+  /* ---------------- 焚き火（スプラッシュ専用 / 本番 drawCampfire の移植 + grow） ---------------- */
+  function nsCampfire(g, cx, baseY, unit, rgb, t, seed, grow) {
+    var u = unit;
+    var dark = mix(rgb, { r: 8, g: 6, b: 12 }, 0.55);
+    var mid = rgb;
+    var inner = mix(rgb, { r: 255, g: 246, b: 214 }, 0.72);
+
+    g.strokeStyle = '#3a2718';
+    g.lineCap = 'round';
+    g.lineWidth = Math.max(2, u * 0.22);
+    g.beginPath(); g.moveTo(cx - u * 0.72, baseY + u * 0.16); g.lineTo(cx + u * 0.72, baseY - u * 0.1); g.stroke();
+    g.beginPath(); g.moveTo(cx - u * 0.66, baseY - u * 0.06); g.lineTo(cx + u * 0.7, baseY + u * 0.2); g.stroke();
+    g.fillStyle = rgba(mix(rgb, { r: 255, g: 150, b: 40 }, 0.45), 0.85 * Math.min(1, grow * 2));
+    g.fillRect(Math.round(cx - u * 0.5), Math.round(baseY + u * 0.1), Math.max(2, Math.round(u * 0.3)), 2);
+    g.fillRect(Math.round(cx + u * 0.22), Math.round(baseY + u * 0.04), Math.max(2, Math.round(u * 0.26)), 2);
+
+    if (grow <= 0.02) return;
+    var tongues = [
+      { dx: 0, h: 1.95, w: 0.5, tint: 0, d: 0 },
+      { dx: -0.34, h: 1.28, w: 0.36, tint: 0.12, d: 0.15 },
+      { dx: 0.34, h: 1.16, w: 0.34, tint: 0.16, d: 0.25 },
+      { dx: -0.14, h: 0.82, w: 0.24, tint: 0.3, d: 0.35 },
+      { dx: 0.18, h: 0.7, w: 0.22, tint: 0.34, d: 0.45 }
+    ];
+    for (var i = 0; i < tongues.length; i++) {
+      var tg = tongues[i];
+      var gi = clamp((grow - tg.d) / (1 - tg.d), 0, 1);
+      if (gi <= 0) continue;
+      var fl = flicker(t + i * 0.7, seed + i * 1.9);
+      var hh = u * tg.h * fl * gi;
+      var ww = u * tg.w * (0.4 + 0.6 * gi);
+      var x0 = cx + u * tg.dx;
+      var layers = [
+        { col: rgba(mix(dark, mid, tg.tint), 0.95), k: 1 },
+        { col: rgba(mix(mid, inner, 0.16 + tg.tint), 0.95), k: 0.66 },
+        { col: rgba(inner, 0.9), k: 0.34 }
+      ];
+      for (var L = 0; L < layers.length; L++) {
+        var lay = layers[L];
+        var layerH = hh * (1 - L * 0.26);
+        var rows = Math.round(layerH / 2);
+        for (var r = 0; r <= rows; r++) {
+          var pp = r / Math.max(1, rows);
+          var prof = Math.sin(Math.PI * Math.pow(pp, 0.72)) * (1 - pp * 0.18);
+          var wpx = ww * lay.k * Math.max(0.12, prof);
+          var wob = Math.sin(pp * 3.6 + t * 4.4 + seed + i) * u * 0.1 * pp;
+          var y = baseY - layerH * pp;
+          g.fillStyle = lay.col;
+          g.fillRect(Math.round(x0 + wob - wpx / 2), Math.round(y), Math.max(1, Math.round(wpx)), 2);
+        }
+      }
+    }
+    for (var k = 0; k < 4; k++) {
+      var ph = ((t * 0.5 + k * 0.29 + seed) % 1);
+      g.fillStyle = rgba(inner, 0.85 * (1 - ph) * grow);
+      g.fillRect(Math.round(cx + Math.sin(seed + k * 2.1 + ph * 2) * u * 0.6), Math.round(baseY - u * (1.1 + ph * 2.2)), 2, 2);
+    }
+  }
+
+  /* ---------------- 煙（本番 drawSmokeColumn の拡張: grow + 2レイヤー渦） ---------------- */
+  function nsSmoke(g, fx, fireY, unit, t, rgb, topY, grow, alphaMul, seed) {
+    if (grow <= 0) return;
+    var puffs = 40;
+    for (var layer = 0; layer < 2; layer++) {
+      var lt = t + layer * 0.9 + seed;
+      var la = layer ? 0.55 : 1;
+      for (var i = 0; i < puffs; i++) {
+        var ph = i / (puffs - 1);
+        if (ph > grow) break;
+        var y = fireY - unit * 0.4 + (topY - fireY + unit * 0.4) * ph;
+        var wob = Math.sin(ph * 4.4 + lt * 0.5) * unit * (0.1 + ph * 0.95)
+                + Math.sin(ph * 9.2 - lt * 0.3) * unit * ph * 0.28
+                + ph * ph * unit * 0.9;
+        var x = fx + wob + (layer ? Math.sin(ph * 6 + lt) * unit * 0.25 * ph : 0);
+        var front = grow < 1 ? Math.max(0, 1 - (grow - ph) / 0.08) : 0;
+        var r = unit * (0.26 + ph * 0.62) * (0.9 + 0.18 * Math.sin(i * 2.7 + layer)) * (1 + front * 0.35);
+        var a = 0.36 * Math.min(1, ph * 3.2) * Math.pow(1 - ph, 1.1) * alphaMul * la * (1 + front * 0.5);
+        if (a <= 0.012) continue;
+        var col = mix(rgb, { r: 240, g: 244, b: 255 }, 0.18 + ph * 0.42);
+        var gr = g.createRadialGradient(x, y, 0, x, y, r);
+        gr.addColorStop(0, rgba(col, a));
+        gr.addColorStop(0.55, rgba(col, a * 0.6));
+        gr.addColorStop(1, rgba(col, 0));
+        g.fillStyle = gr;
+        g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+      }
+    }
+  }
+
+  /* ---------------- DOM ---------------- */
+  var frameEl = document.getElementById('ns-frame');
+  var cv = document.getElementById('ns-canvas');
+  var g = cv.getContext('2d');
+  var shadeEl = document.getElementById('ns-shade');
+  var markEl = document.getElementById('ns-mark');
+  var flameEl = document.getElementById('ns-flame');
+  var charsEl = document.getElementById('ns-chars');
+  var charEls = charsEl ? charsEl.children : [];
+  var tagEl = document.getElementById('ns-tag');
+  var fadeEl = document.getElementById('ns-fade');
+
+  var buf = document.createElement('canvas');
+  buf.width = BUF_W; buf.height = WORLD_H / PX;
+  var bg2d = buf.getContext('2d');
+
+  var bgImg = null, bgLoaded = false;
+  var img = new Image();
+  img.onload = function () { bgImg = img; bgLoaded = true; if (FIX_T) render(parseFloat(FIX_T) || 0); };
+  img.src = 'img/bg-night.webp?v=2';
+
+  var titleEl = document.getElementById('ns-title');
+  function fit() {
+    var sCover = Math.max(window.innerWidth / W, window.innerHeight / H);
+    var sFit = Math.min(window.innerWidth / W, window.innerHeight / H);
+    frameEl.style.transform = 'translate(-50%,-50%) scale(' + sCover + ')';
+    // cover で左右が切れてもロゴ・タグラインが見切れないよう contain 相当まで縮める
+    if (titleEl) titleEl.style.transform = 'scale(' + Math.min(1, sFit / sCover) + ')';
+  }
+  fit();
+  window.addEventListener('resize', fit);
+
+  /* ---------------- 描画 ---------------- */
+  function render(t) {
+    t = Math.min(t, 7.0);
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.globalAlpha = 1;
+    g.globalCompositeOperation = 'source-over';
+    g.fillStyle = '#080b14';
+    g.fillRect(0, 0, W, H);
+
+    var k = E.inOutSine(clamp(t / 7, 0, 1));
+    var z = 1 + 0.16 * k;
+    var cx = 1530 + (FIRE_X - 1530) * E.outCubic(clamp(t / 5, 0, 1));
+    var cy = 960 + 52 * k;
+    g.setTransform(z, 0, 0, z, W / 2 - cx * z, H / 2 - cy * z);
+
+    var sceneIn = seg(t, 0.15, 1.7, E.outCubic);
+
+    if (bgLoaded) {
+      g.imageSmoothingEnabled = false;
+      g.globalAlpha = sceneIn;
+      g.drawImage(bgImg, 0, 0, WORLD_W, WORLD_H);
+      g.globalAlpha = 1;
+    } else {
+      // 画像未取得時のフォールバック（黒画面を避ける）
+      var fb = g.createLinearGradient(0, 0, 0, WORLD_H);
+      fb.addColorStop(0, 'rgba(8,12,26,' + sceneIn + ')');
+      fb.addColorStop(0.55, 'rgba(14,22,44,' + sceneIn + ')');
+      fb.addColorStop(1, 'rgba(6,9,18,' + sceneIn + ')');
+      g.fillStyle = fb;
+      g.fillRect(0, 0, WORLD_W, WORLD_H);
+    }
+
+    var i;
+    for (i = 0; i < STARS.length; i++) {
+      var s = STARS[i];
+      var a = (0.25 + 0.75 * Math.max(0, Math.sin(t * s.sp + s.p))) * sceneIn;
+      g.fillStyle = 'rgba(220,230,255,' + (a * 0.85).toFixed(3) + ')';
+      var sz = s.big ? 5 : 3;
+      g.fillRect(Math.round(s.x), Math.round(s.y), sz, sz);
+    }
+
+    var mx = 1790, my = 360, mr = 46;
+    var moonA = seg(t, 0.5, 2.0, E.outCubic);
+    var halo = g.createRadialGradient(mx, my, mr * 0.6, mx, my, mr * 4.2);
+    halo.addColorStop(0, 'rgba(186,208,255,' + (0.42 * moonA) + ')');
+    halo.addColorStop(1, 'rgba(186,208,255,0)');
+    g.fillStyle = halo; g.beginPath(); g.arc(mx, my, mr * 4.2, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(246,249,255,' + moonA + ')';
+    g.beginPath(); g.arc(mx, my, mr, 0, 6.283); g.fill();
+    g.fillStyle = 'rgba(200,214,245,' + (0.8 * moonA) + ')';
+    g.beginPath(); g.arc(mx - 15, my - 8, 11, 0, 6.283); g.fill();
+    g.beginPath(); g.arc(mx + 14, my + 12, 8, 0, 6.283); g.fill();
+    g.beginPath(); g.arc(mx + 6, my - 20, 4.5, 0, 6.283); g.fill();
+
+    var dim = multi(t, [0, 1.4, 2.2], [0.55, 0.42, 0.18]);
+    g.fillStyle = 'rgba(4,6,14,' + dim + ')';
+    g.fillRect(0, 0, WORLD_W, WORLD_H);
+
+    var ember = seg(t, 0.9, 1.15);
+    var grow = seg(t, 1.25, 2.1, E.outBack);
+    var smokeGrow = seg(t, 1.7, 4.4, E.outCubic);
+
+    var glowA = (ember * 0.25 + Math.max(0, grow) * 0.55) * flicker(t * 0.8, 3);
+    if (glowA > 0) {
+      g.globalCompositeOperation = 'lighter';
+      var gl = g.createRadialGradient(FIRE_X, FIRE_Y - 20, 0, FIRE_X, FIRE_Y - 20, 260);
+      gl.addColorStop(0, 'rgba(255,150,60,' + (0.5 * glowA) + ')');
+      gl.addColorStop(0.4, 'rgba(255,110,40,' + (0.16 * glowA) + ')');
+      gl.addColorStop(1, 'rgba(255,90,30,0)');
+      g.fillStyle = gl;
+      g.fillRect(FIRE_X - 280, FIRE_Y - 300, 560, 560);
+      for (i = 0; i < 16; i++) {
+        var yy = FIRE_Y + 10 + i * 9;
+        var w = (34 - i * 1.4) * (0.7 + 0.3 * Math.sin(t * 6 + i * 1.7)) * Math.max(0, grow);
+        var xo = Math.sin(t * 2.2 + i * 0.9) * (3 + i * 0.6);
+        g.fillStyle = 'rgba(255,160,70,' + (0.42 * glowA * (1 - i / 16)).toFixed(3) + ')';
+        g.fillRect(Math.round(FIRE_X - w / 2 + xo), yy, Math.max(0, Math.round(w)), 4);
+      }
+      g.globalCompositeOperation = 'source-over';
+    }
+
+    bg2d.setTransform(1, 0, 0, 1, 0, 0);
+    bg2d.clearRect(0, 0, buf.width, buf.height);
+    function toBX(wx) { return (wx - BX0) / PX; }
+    function toBY(wy) { return wy / PX; }
+
+    for (i = 0; i < OTHERS.length; i++) {
+      var o = OTHERS[i];
+      var og = seg(t, o.start, o.start + 2.4, E.outCubic);
+      if (og <= 0) continue;
+      var ox = toBX(o.x), oy = toBY(o.y);
+      var rgb = hex(o.color);
+      nsSmoke(bg2d, ox, oy, o.unit, t, rgb, o.top / PX, og, 0.9, o.seed);
+      bg2d.fillStyle = rgba(mix(rgb, { r: 255, g: 240, b: 210 }, 0.5), Math.min(1, og * 4) * (0.7 + 0.3 * Math.sin(t * 9 + o.seed)));
+      bg2d.fillRect(Math.round(ox - 1), Math.round(oy - 2), 2, 2);
+    }
+
+    var fx = toBX(FIRE_X), fy = toBY(FIRE_Y);
+    nsSmoke(bg2d, fx, fy - 6, 28, t, hex(ACCENT), 150 / PX, smokeGrow, 1, 0);
+    if (ember > 0 && grow <= 0.02) {
+      var blink = 0.6 + 0.4 * Math.sin(t * 22);
+      bg2d.fillStyle = 'rgba(255,200,120,' + (ember * blink) + ')';
+      bg2d.fillRect(Math.round(fx - 1), Math.round(fy - 2), 2, 2);
+    }
+    if (grow > 0) nsCampfire(bg2d, fx, fy, 16, hex('#ffae4a'), t, 0.7, Math.max(0, grow));
+
+    g.imageSmoothingEnabled = false;
+    g.drawImage(buf, BX0, 0, buf.width * PX, buf.height * PX);
+
+    /* ---- ロゴ・タグライン ---- */
+    var markIn = seg(t, 3.9, 4.6, E.outBack);
+    var markA = seg(t, 3.9, 4.3);
+    markEl.style.opacity = markA;
+    markEl.style.transform = 'translateY(' + ((1 - markIn) * 30) + 'px) scale(' + (0.6 + 0.4 * markIn) + ')';
+    if (flameEl) {
+      var fl = 1 + 0.05 * Math.sin(t * 9) + 0.03 * Math.sin(t * 17);
+      flameEl.style.transform = 'scale(' + (2 - fl) + ',' + fl + ')';
+    }
+    for (i = 0; i < charEls.length; i++) {
+      var st = 4.15 + i * 0.14;
+      var p = seg(t, st, st + 0.7, E.outCubic);
+      var ce = charEls[i];
+      ce.style.opacity = p;
+      ce.style.transform = 'translateY(' + ((1 - p) * 46) + 'px)';
+      ce.style.filter = 'blur(' + ((1 - p) * 14) + 'px)';
+    }
+    tagEl.style.opacity = seg(t, 5.0, 5.7, E.outCubic);
+    tagEl.style.transform = 'translateY(' + ((1 - seg(t, 5.0, 5.7, E.outCubic)) * 16) + 'px)';
+    shadeEl.style.opacity = seg(t, 3.4, 4.6);
+    fadeEl.style.opacity = Math.max(seg(t, 0, 0.5) === 0 ? 1 : (1 - seg(t, 0, 0.5)), seg(t, 6.35, 7.0, E.inCubic));
+  }
+
+  /* ---------------- 再生制御 ---------------- */
+  var today = (function () {
+    var d = new Date();
+    return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  })();
+  var seenToday = false;
+  try { seenToday = localStorage.getItem(STORE_KEY) === today; } catch (e) {}
+  var reduce = false;
+  try { reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+
+  var t = 0, lastTs = 0, rafId = 0, paused = false, appReady = false, finished = false;
+
+  function finish() {
+    if (finished) return;
+    finished = true;
+    if (rafId) cancelAnimationFrame(rafId);
+    root.style.transition = 'opacity .4s ease';
+    root.style.opacity = '0';
+    root.style.pointerEvents = 'none';
+    document.documentElement.classList.remove('ns-lock');
+    document.body.classList.remove('ns-lock');
+    try { localStorage.setItem(STORE_KEY, today); } catch (e) {}
+    setTimeout(function () { if (root.parentNode) root.parentNode.removeChild(root); }, 460);
+    window.NS_Splash = null;
+  }
+
+  // アプリ側（位置情報・一覧取得の完了）から呼ばれる
+  window.NS_Splash = {
+    markAppReady: function () {
+      appReady = true;
+      if (finished) return;
+      if (reduce || seenToday) { finish(); return; }
+      if (t >= 7.0) finish();
+    }
+  };
+
+  document.documentElement.classList.add('ns-lock');
+  document.body.classList.add('ns-lock');
+
+  // タップでスキップ（終端のフェードへ）
+  root.addEventListener('pointerdown', function () {
+    if (finished) return;
+    if (reduce || seenToday) { finish(); return; }
+    t = 6.55; lastTs = 0;
+  }, { passive: true });
+
+  function loop(ts) {
+    if (finished) return;
+    if (paused) { rafId = requestAnimationFrame(loop); return; }
+    if (!lastTs) lastTs = ts;
+    var dt = Math.min(0.05, (ts - lastTs) / 1000);
+    lastTs = ts;
+    t += dt;
+    render(t);
+    if (seenToday && t >= 0.6) { finish(); return; }
+    if (t >= 7.0) {
+      if (appReady) { finish(); return; }
+      t = 7.0;
+    }
+    rafId = requestAnimationFrame(loop);
+  }
+
+  document.addEventListener('visibilitychange', function () {
+    paused = document.hidden;
+    lastTs = 0;
+  });
+
+  if (FIX_T) {
+    render(parseFloat(FIX_T) || 0);
+  } else if (reduce) {
+    render(7.0);           // 最終フレーム静止 → 初期化完了でフェード
+  } else if (seenToday) {
+    render(6.9);           // 2回目以降はロゴのみ 0.6 秒
+    setTimeout(function () { if (!finished) finish(); }, 700);
+  } else {
+    render(0);
+    rafId = requestAnimationFrame(loop);
+  }
+})();
+
 </script>
 </body>
 </html>
